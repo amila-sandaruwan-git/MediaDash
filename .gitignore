@@ -10,6 +10,12 @@
 !.yarn/releases
 !.yarn/versions
 
+# Cache and temporary files
+/cache/
+/tmp/
+*.log
+*.cache
+
 # testing
 /coverage
 
