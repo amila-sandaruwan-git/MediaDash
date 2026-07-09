@@ -7,9 +7,6 @@
 
 > Download videos, audio, and thumbnails from YouTube, Facebook, Instagram, TikTok, and 1000+ other platforms with one click!
 
-## 📸 Screenshots
-
-![MediaDash Home Page](https://your-image-host.com/screenshot.png)
 
 ## ✨ Features
 
