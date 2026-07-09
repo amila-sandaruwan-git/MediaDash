@@ -45,3 +45,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/cache/
+/tmp/
+*.mp4
+*.mp3
+*.part
+*.webm
+*.mkv
+*.log
