@@ -1,16 +1,22 @@
 'use client'
 
 import { MediaInfo, VideoFormat, AudioFormat } from '../types'
-import { FaDownload, FaVideo, FaMusic, FaImage, FaSpinner } from 'react-icons/fa'
+import { FaDownload, FaVideo, FaMusic, FaImage, FaSpinner, FaClock, FaCheck } from 'react-icons/fa'
 import { useState } from 'react'
 
 interface ResultSectionProps {
   mediaInfo: MediaInfo | null
+  cacheInfo?: {
+    cachedFormats: string[]
+    cacheSize: number
+    isAudioCached: boolean
+  }
 }
 
-export default function ResultSection({ mediaInfo }: ResultSectionProps) {
+export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionProps) {
   const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'thumbnail'>('video')
-  const [downloading, setDownloading] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [buttonStatus, setButtonStatus] = useState<Record<string, string>>({})
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   if (!mediaInfo) return null
@@ -23,16 +29,12 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const handleDownload = async (url: string, quality: string, type: 'video' | 'audio') => {
+  const handleDownload = async (url: string, quality: string, type: 'video' | 'audio', buttonId: string) => {
     try {
-      setDownloading(quality)
+      setDownloadingId(buttonId)
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Checking cache...' }))
       setDownloadError(null)
 
-      // Extract video ID from URL for filename
-      const videoId = url.split('v=')[1]?.split('&')[0] || Date.now().toString()
-      const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
-      
-      // Call the download API
       const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {
@@ -51,8 +53,14 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
         throw new Error(errorData.message || 'Download failed')
       }
 
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Downloading...' }))
+
       // Get the blob from response
       const blob = await response.blob()
+      
+      const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
+      
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! 🎉' }))
       
       // Create download link
       const link = document.createElement('a')
@@ -63,12 +71,96 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
       document.body.removeChild(link)
       URL.revokeObjectURL(link.href)
 
+      // Reset button after 2.5 seconds
+      setTimeout(() => {
+        setButtonStatus(prev => {
+          const newStatus = { ...prev }
+          delete newStatus[buttonId]
+          return newStatus
+        })
+        setDownloadingId(null)
+      }, 2500)
+
     } catch (error: any) {
       console.error('Download failed:', error)
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Failed! ❌' }))
       setDownloadError(error.message || 'Download failed. Please try again.')
-    } finally {
-      setDownloading(null)
+      setTimeout(() => {
+        setButtonStatus(prev => {
+          const newStatus = { ...prev }
+          delete newStatus[buttonId]
+          return newStatus
+        })
+        setDownloadingId(null)
+      }, 3000)
     }
+  }
+
+  const isFormatCached = (quality: string): boolean => {
+    if (!cacheInfo) return false
+    return cacheInfo.cachedFormats.includes(quality)
+  }
+
+  // Render button content based on status
+  const renderButtonContent = (buttonId: string, isCached: boolean, defaultText: string) => {
+    const status = buttonStatus[buttonId]
+    
+    if (status) {
+      // Show status with appropriate icon
+      if (status.includes('Checking')) {
+        return (
+          <>
+            <FaSpinner className="animate-spin mr-2" />
+            {status}
+          </>
+        )
+      } else if (status.includes('Downloading')) {
+        return (
+          <>
+            <FaSpinner className="animate-spin mr-2" />
+            {status}
+          </>
+        )
+      } else if (status.includes('Complete')) {
+        return (
+          <>
+            <FaCheck className="mr-2" />
+            {status}
+          </>
+        )
+      } else if (status.includes('Failed')) {
+        return (
+          <>
+            <span className="mr-2">❌</span>
+            {status}
+          </>
+        )
+      }
+      return <span>{status}</span>
+    }
+    
+    // Default button text
+    return (
+      <>
+        <FaDownload className="mr-2" />
+        {defaultText}
+      </>
+    )
+  }
+
+  // Get button color based on status
+  const getButtonColor = (buttonId: string, isCached: boolean, type: 'video' | 'audio') => {
+    const status = buttonStatus[buttonId]
+    
+    if (status) {
+      if (status.includes('Checking')) return 'bg-blue-600 hover:bg-blue-700'
+      if (status.includes('Downloading')) return 'bg-orange-600 hover:bg-orange-700'
+      if (status.includes('Complete')) return 'bg-green-600 hover:bg-green-700'
+      if (status.includes('Failed')) return 'bg-red-600 hover:bg-red-700'
+    }
+    
+    if (isCached) return 'bg-green-600 hover:bg-green-700'
+    return type === 'video' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'
   }
 
   return (
@@ -111,7 +203,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
             }`}
           >
             <FaVideo className="inline mr-2" />
-            Video
+            Video ({mediaInfo.video_formats.length})
           </button>
           <button
             onClick={() => setActiveTab('audio')}
@@ -122,7 +214,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
             }`}
           >
             <FaMusic className="inline mr-2" />
-            Audio
+            Audio ({mediaInfo.audio_formats.length})
           </button>
           <button
             onClick={() => setActiveTab('thumbnail')}
@@ -142,39 +234,47 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           {activeTab === 'video' && mediaInfo.video_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {mediaInfo.video_formats.map((format: VideoFormat) => {
-                // Extract resolution number for quality selection
                 const resolutionMatch = format.resolution.match(/(\d+)/)
                 const qualityNumber = resolutionMatch ? parseInt(resolutionMatch[0]) : 720
-                const isDownloading = downloading === format.resolution
+                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
+                const isCached = isFormatCached(format.resolution)
+                const buttonId = `video_${format.format_id}`
+                const isDownloading = downloadingId === buttonId
+                const currentStatus = buttonStatus[buttonId]
+                
+                // Determine if we should show cached badge
+                const showCachedBadge = isCached && !currentStatus
                 
                 return (
-                  <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={format.format_id} className={`bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow ${
+                    showCachedBadge ? 'border-2 border-green-400 dark:border-green-600' : ''
+                  }`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{format.resolution}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          {format.resolution}
+                          {showCachedBadge && (
+                            <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              ⚡ Cached
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{format.quality}</div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">{format.ext.toUpperCase()}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {format.ext.toUpperCase()} • {fileSize}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'}
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <FaClock />
+                        <span>{isCached ? 'Instant' : fileSize.includes('GB') ? '~2-5 min' : fileSize.includes('MB') ? '~5-30 sec' : '~2-5 sec'}</span>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDownload(mediaInfo.webpage_url, qualityNumber.toString(), 'video')}
+                      onClick={() => handleDownload(mediaInfo.webpage_url, qualityNumber.toString(), 'video', buttonId)}
                       disabled={isDownloading}
-                      className="w-full mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'video')} disabled:opacity-90 min-h-[44px]`}
                     >
-                      {isDownloading ? (
-                        <>
-                          <FaSpinner className="animate-spin" />
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <FaDownload />
-                          Download
-                        </>
-                      )}
+                      {renderButtonContent(buttonId, isCached, isCached ? 'Download (Cached)' : 'Download')}
                     </button>
                   </div>
                 )
@@ -185,35 +285,41 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           {activeTab === 'audio' && mediaInfo.audio_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {mediaInfo.audio_formats.map((format: AudioFormat) => {
-                const isDownloading = downloading === format.bitrate
+                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
+                const isCached = cacheInfo?.isAudioCached || false
+                const buttonId = `audio_${format.format_id}`
+                const isDownloading = downloadingId === buttonId
+                const currentStatus = buttonStatus[buttonId]
+                const showCachedBadge = isCached && !currentStatus
                 
                 return (
-                  <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={format.format_id} className={`bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow ${
+                    showCachedBadge ? 'border-2 border-green-400 dark:border-green-600' : ''
+                  }`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white">{format.bitrate}</div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">{format.ext.toUpperCase()}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          {format.bitrate}
+                          {showCachedBadge && (
+                            <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              ⚡ Cached
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {format.ext.toUpperCase()} • {fileSize}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'}
+                      <div className="text-xs text-gray-400">
+                        {isCached ? 'Instant' : fileSize.includes('MB') ? '5-15 sec' : '2-5 sec'}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDownload(mediaInfo.webpage_url, 'audio', 'audio')}
+                      onClick={() => handleDownload(mediaInfo.webpage_url, 'audio', 'audio', buttonId)}
                       disabled={isDownloading}
-                      className="w-full mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'audio')} disabled:opacity-90 min-h-[44px]`}
                     >
-                      {isDownloading ? (
-                        <>
-                          <FaSpinner className="animate-spin" />
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <FaDownload />
-                          Download MP3
-                        </>
-                      )}
+                      {renderButtonContent(buttonId, isCached, isCached ? 'Download MP3 (Cached)' : 'Download MP3')}
                     </button>
                   </div>
                 )
@@ -240,9 +346,12 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 }}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mx-auto"
               >
-                <FaDownload />
+                <FaDownload className="mr-2" />
                 Download Thumbnail
               </button>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Thumbnail downloads instantly
+              </p>
             </div>
           )}
         </div>

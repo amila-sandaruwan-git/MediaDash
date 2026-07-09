@@ -5,6 +5,7 @@ import { MediaInfo, VideoFormat, AudioFormat } from '../../types'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { randomUUID } from 'crypto'
+import { cacheManager } from '../../lib/cache'
 
 const execPromise = promisify(exec)
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If this is a download request (not just fetching info)
+    // If this is a download request
     if (action === 'download') {
       if (!url || !formatId) {
         return NextResponse.json(
@@ -52,37 +53,60 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate a unique filename
+      const isAudio = quality === 'audio'
+      const cacheKey = isAudio ? 'audio' : `${quality}p`
+
+      // --- CHECK CACHE FIRST ---
+      console.log(`[Cache] Checking cache for: ${url} (${cacheKey})`)
+      const cached = await cacheManager.getFromCache(url, cacheKey, isAudio ? 'audio' : 'video')
+      
+      if (cached) {
+        console.log(`[Cache] ✅ Cache hit! Serving from cache: ${cacheKey}`)
+        // Convert Buffer to Uint8Array for NextResponse
+        const uint8Array = new Uint8Array(cached.buffer)
+        return new NextResponse(uint8Array, {
+          status: 200,
+          headers: {
+            'Content-Disposition': `attachment; filename="${cached.metadata.filename}"`,
+            'Content-Type': cached.metadata.mimeType,
+            'Content-Length': cached.buffer.length.toString(),
+            'X-Cache-Status': 'HIT',
+            'X-Cache-Size': formatFileSize(cached.buffer.length),
+          },
+        })
+      }
+
+      console.log(`[Cache] ❌ Cache miss. Downloading: ${cacheKey}`)
+
+      // --- NOT IN CACHE - DOWNLOAD ---
       const filename = `${randomUUID()}_${Date.now()}`
       const outputPath = path.join(process.cwd(), 'tmp', filename)
       
-      // Ensure tmp directory exists
       await fs.mkdir(path.join(process.cwd(), 'tmp'), { recursive: true })
 
       let downloadCommand: string
       let fileExtension: string = 'mp4'
+      let mimeType: string = 'video/mp4'
 
-      if (quality === 'audio') {
-        // Download audio only
+      if (isAudio) {
         fileExtension = 'mp3'
+        mimeType = 'audio/mpeg'
         downloadCommand = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --extract-audio --audio-format mp3 --audio-quality 320K -o "${outputPath}.%(ext)s" "${url}"`
       } else {
-        // Download video with audio (merged)
-        // Try to get best video + best audio merged
-        downloadCommand = `yt-dlp -f "bestvideo[height<=${quality}]+bestaudio[ext=m4a]/best[height<=${quality}]" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${url}"`
+        const height = parseInt(quality) || 720
+        downloadCommand = `yt-dlp -f "bestvideo[height<=${height}]+bestaudio[ext=m4a]/best[height<=${height}]" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${url}"`
         fileExtension = 'mp4'
+        mimeType = 'video/mp4'
       }
 
       console.log('Executing download command:', downloadCommand)
       
-      // Execute the download
       const { stdout, stderr } = await execPromise(downloadCommand)
 
       if (stderr && !stderr.includes('WARNING')) {
         console.error('yt-dlp stderr:', stderr)
       }
 
-      // Find the downloaded file
       const files = await fs.readdir('tmp')
       const downloadedFile = files.find(f => f.startsWith(filename))
 
@@ -97,33 +121,48 @@ export async function POST(request: NextRequest) {
       const fileBuffer = await fs.readFile(filePath)
       const fileStats = await fs.stat(filePath)
       
-      // Get file extension from the actual downloaded file
       const ext = path.extname(downloadedFile).substring(1)
       
-      // Determine content type
-      let contentType = 'video/mp4'
-      if (ext === 'mp3') contentType = 'audio/mpeg'
-      else if (ext === 'webm') contentType = 'video/webm'
-      else if (ext === 'mkv') contentType = 'video/x-matroska'
+      if (ext === 'mp3') mimeType = 'audio/mpeg'
+      else if (ext === 'webm') mimeType = 'video/webm'
+      else if (ext === 'mkv') mimeType = 'video/x-matroska'
+      else if (ext === 'mp4') mimeType = 'video/mp4'
+
+      // --- SAVE TO CACHE ---
+      try {
+        console.log(`[Cache] Saving ${cacheKey} to cache...`)
+        await cacheManager.saveToCache(
+          url,
+          cacheKey,
+          isAudio ? 'audio' : 'video',
+          fileBuffer,
+          ext,
+          mimeType
+        )
+        console.log(`[Cache] ✅ Saved to cache: ${cacheKey}`)
+      } catch (cacheError) {
+        console.error('[Cache] Failed to save to cache:', cacheError)
+      }
       
-      // Clean up - delete the file after reading
       await fs.unlink(filePath).catch(() => {})
 
-      // Return the file
-      return new NextResponse(fileBuffer, {
+      // Convert Buffer to Uint8Array for NextResponse
+      const uint8Array = new Uint8Array(fileBuffer)
+      return new NextResponse(uint8Array, {
         status: 200,
         headers: {
           'Content-Disposition': `attachment; filename="media.${ext}"`,
-          'Content-Type': contentType,
+          'Content-Type': mimeType,
           'Content-Length': fileStats.size.toString(),
+          'X-Cache-Status': 'MISS',
+          'X-Cache-Size': formatFileSize(fileStats.size),
         },
       })
 
     } else {
-      // --- GET INFO ONLY (Original functionality) ---
+      // --- GET INFO ONLY ---
       console.log('Fetching info for URL:', url)
       
-      // Use yt-dlp to fetch media information
       const command = `yt-dlp --dump-json --no-playlist --skip-download "${url}"`
       
       const { stdout, stderr } = await execPromise(command)
@@ -134,7 +173,6 @@ export async function POST(request: NextRequest) {
 
       const data = JSON.parse(stdout)
 
-      // Process video formats
       const videoFormats: VideoFormat[] = data.formats
         .filter((f: any) => f.vcodec !== 'none')
         .map((f: any) => ({
@@ -145,14 +183,13 @@ export async function POST(request: NextRequest) {
           ext: f.ext,
           url: f.url || ''
         }))
-        .filter((f: VideoFormat) => f.url) // Only include formats with URLs
+        .filter((f: VideoFormat) => f.url)
         .sort((a: VideoFormat, b: VideoFormat) => {
           const aHeight = parseInt(a.resolution) || 0
           const bHeight = parseInt(b.resolution) || 0
           return bHeight - aHeight
         })
 
-      // Process audio formats
       const audioFormats: AudioFormat[] = data.formats
         .filter((f: any) => f.acodec !== 'none' && f.vcodec === 'none')
         .map((f: any) => ({
@@ -162,12 +199,22 @@ export async function POST(request: NextRequest) {
           ext: f.ext,
           url: f.url || ''
         }))
-        .filter((f: AudioFormat) => f.url) // Only include formats with URLs
+        .filter((f: AudioFormat) => f.url)
         .sort((a: AudioFormat, b: AudioFormat) => {
           const aBitrate = parseInt(a.bitrate) || 0
           const bBitrate = parseInt(b.bitrate) || 0
           return bBitrate - aBitrate
         })
+
+      // Check which formats are cached
+      const cachedFormats = new Set()
+      for (const format of videoFormats) {
+        const resMatch = format.resolution.match(/(\d+)/)
+        if (resMatch) {
+          const isCached = await cacheManager.isCached(url, `${resMatch[0]}p`, 'video')
+          if (isCached) cachedFormats.add(resMatch[0])
+        }
+      }
 
       const mediaInfo: MediaInfo = {
         title: data.title || 'Untitled',
@@ -180,7 +227,12 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: mediaInfo
+        data: mediaInfo,
+        cacheInfo: {
+          cachedFormats: Array.from(cachedFormats),
+          cacheSize: await cacheManager.getCacheSizeMB(),
+          isAudioCached: await cacheManager.isCached(url, 'audio', 'audio'),
+        }
       })
     }
 
@@ -197,8 +249,6 @@ export async function POST(request: NextRequest) {
       errorMessage = 'This video is private. Please use a public video URL.'
     } else if (error.message?.includes('ERROR: File not found')) {
       errorMessage = 'The requested file could not be found. Try a different quality.'
-    } else if (error.message?.includes('yt-dlp is not installed')) {
-      errorMessage = error.message
     }
 
     return NextResponse.json(

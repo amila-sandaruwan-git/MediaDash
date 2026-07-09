@@ -1,5 +1,3 @@
-//app/page.tsx
-
 'use client'
 
 import { useState } from 'react'
@@ -15,6 +13,7 @@ import axios from 'axios'
 
 export default function Home() {
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null)
+  const [cacheInfo, setCacheInfo] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,12 +21,14 @@ export default function Home() {
     setIsLoading(true)
     setError(null)
     setMediaInfo(null)
+    setCacheInfo(null)
 
     try {
       const response = await axios.post('/api/convert', { url })
       
       if (response.data.success) {
         setMediaInfo(response.data.data)
+        setCacheInfo(response.data.cacheInfo || null)
         setTimeout(() => {
           document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })
         }, 200)
@@ -57,7 +58,7 @@ export default function Home() {
           </div>
         )}
         
-        {mediaInfo && <ResultSection mediaInfo={mediaInfo} />}
+        {mediaInfo && <ResultSection mediaInfo={mediaInfo} cacheInfo={cacheInfo} />}
         
         <AboutSection />
         <HelpSection />
