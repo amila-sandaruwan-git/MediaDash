@@ -54,3 +54,14 @@ next-env.d.ts
 *.webm
 *.mkv
 *.log
+
+# Cache and temporary files
+/cache/
+/tmp/
+*.mp4
+*.mp3
+*.part
+*.webm
+*.mkv
+*.log
+*.cache
