@@ -17,6 +17,7 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
   const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'thumbnail'>('video')
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [buttonStatus, setButtonStatus] = useState<Record<string, string>>({})
+  const [progress, setProgress] = useState<Record<string, number>>({})
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   if (!mediaInfo) return null
@@ -33,7 +34,19 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
     try {
       setDownloadingId(buttonId)
       setButtonStatus(prev => ({ ...prev, [buttonId]: 'Checking cache...' }))
+      setProgress(prev => ({ ...prev, [buttonId]: 0 }))
       setDownloadError(null)
+
+      // Simulate progress during cache check (0-30%)
+      let progressInterval = setInterval(() => {
+        setProgress(prev => {
+          const current = prev[buttonId] || 0
+          if (current < 30) {
+            return { ...prev, [buttonId]: current + Math.random() * 2 + 1 }
+          }
+          return prev
+        })
+      }, 100)
 
       const response = await fetch('/api/convert', {
         method: 'POST',
@@ -48,21 +61,93 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
         }),
       })
 
+      clearInterval(progressInterval)
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || 'Download failed')
       }
 
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Downloading...' }))
+      // Check if it's a cached response
+      const cacheStatus = response.headers.get('X-Cache-Status')
+      if (cacheStatus === 'HIT') {
+        setProgress(prev => ({ ...prev, [buttonId]: 100 }))
+        setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! ⚡' }))
+        
+        const blob = await response.blob()
+        const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
+        
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(link.href)
 
-      // Get the blob from response
-      const blob = await response.blob()
+        setTimeout(() => {
+          setButtonStatus(prev => {
+            const newStatus = { ...prev }
+            delete newStatus[buttonId]
+            return newStatus
+          })
+          setProgress(prev => {
+            const newProgress = { ...prev }
+            delete newProgress[buttonId]
+            return newProgress
+          })
+          setDownloadingId(null)
+        }, 2500)
+        return
+      }
+
+      // --- REAL DOWNLOAD PROGRESS ---
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Downloading...' }))
+      
+      const contentLength = parseInt(response.headers.get('Content-Length') || '0')
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('Failed to read response stream')
+      }
+
+      const chunks: Uint8Array[] = []
+      let receivedLength = 0
+      
+      // Continue progress from where it left off (30%)
+      setProgress(prev => ({ ...prev, [buttonId]: 30 }))
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          break
+        }
+
+        receivedLength += value.length
+        chunks.push(value)
+
+        // Calculate progress percentage (30-100%)
+        let percent = 30
+        if (contentLength > 0) {
+          percent = 30 + ((receivedLength / contentLength) * 70)
+          percent = Math.min(99, percent)
+        } else {
+          const chunkProgress = 30 + (chunks.length * 1.5)
+          percent = Math.min(99, chunkProgress)
+        }
+        
+        setProgress(prev => ({ ...prev, [buttonId]: percent }))
+      }
+
+      // Download complete
+      setProgress(prev => ({ ...prev, [buttonId]: 100 }))
+      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! 🎉' }))
+      
+      const blob = new Blob(chunks as BlobPart[])
       
       const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
       
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! 🎉' }))
-      
-      // Create download link
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = filename
@@ -71,25 +156,35 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
       document.body.removeChild(link)
       URL.revokeObjectURL(link.href)
 
-      // Reset button after 2.5 seconds
       setTimeout(() => {
         setButtonStatus(prev => {
           const newStatus = { ...prev }
           delete newStatus[buttonId]
           return newStatus
         })
+        setProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[buttonId]
+          return newProgress
+        })
         setDownloadingId(null)
-      }, 2500)
+      }, 3000)
 
     } catch (error: any) {
       console.error('Download failed:', error)
       setButtonStatus(prev => ({ ...prev, [buttonId]: 'Failed! ❌' }))
+      setProgress(prev => ({ ...prev, [buttonId]: 0 }))
       setDownloadError(error.message || 'Download failed. Please try again.')
       setTimeout(() => {
         setButtonStatus(prev => {
           const newStatus = { ...prev }
           delete newStatus[buttonId]
           return newStatus
+        })
+        setProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[buttonId]
+          return newProgress
         })
         setDownloadingId(null)
       }, 3000)
@@ -101,50 +196,59 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
     return cacheInfo.cachedFormats.includes(quality)
   }
 
-  // Render button content based on status
+  // Render button content
   const renderButtonContent = (buttonId: string, isCached: boolean, defaultText: string) => {
     const status = buttonStatus[buttonId]
     
     if (status) {
-      // Show status with appropriate icon
       if (status.includes('Checking')) {
         return (
-          <>
-            <FaSpinner className="animate-spin mr-2" />
-            {status}
-          </>
-        )
-      } else if (status.includes('Downloading')) {
-        return (
-          <>
-            <FaSpinner className="animate-spin mr-2" />
-            {status}
-          </>
-        )
-      } else if (status.includes('Complete')) {
-        return (
-          <>
-            <FaCheck className="mr-2" />
-            {status}
-          </>
-        )
-      } else if (status.includes('Failed')) {
-        return (
-          <>
-            <span className="mr-2">❌</span>
-            {status}
-          </>
+          <div className="flex items-center justify-center gap-2 w-full relative z-10">
+            <FaSpinner className="animate-spin flex-shrink-0" />
+            <span className="text-xs md:text-sm truncate max-w-[180px]">
+              {status}
+            </span>
+          </div>
         )
       }
+      
+      if (status.includes('Downloading')) {
+        return (
+          <div className="flex items-center justify-center gap-2 w-full relative z-10">
+            <FaSpinner className="animate-spin flex-shrink-0" />
+            <span className="text-xs md:text-sm truncate max-w-[200px]">
+              {status}
+            </span>
+          </div>
+        )
+      }
+      
+      if (status.includes('Complete')) {
+        return (
+          <div className="flex items-center justify-center gap-2 w-full relative z-10">
+            <FaCheck className="flex-shrink-0" />
+            <span>{status}</span>
+          </div>
+        )
+      }
+      
+      if (status.includes('Failed')) {
+        return (
+          <div className="flex items-center justify-center gap-2 w-full relative z-10">
+            <span>❌</span>
+            <span>{status}</span>
+          </div>
+        )
+      }
+      
       return <span>{status}</span>
     }
     
-    // Default button text
     return (
-      <>
-        <FaDownload className="mr-2" />
+      <div className="flex items-center justify-center gap-2 w-full">
+        <FaDownload className="flex-shrink-0" />
         {defaultText}
-      </>
+      </div>
     )
   }
 
@@ -241,8 +345,8 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
                 const buttonId = `video_${format.format_id}`
                 const isDownloading = downloadingId === buttonId
                 const currentStatus = buttonStatus[buttonId]
+                const progressValue = progress[buttonId] || 0
                 
-                // Determine if we should show cached badge
                 const showCachedBadge = isCached && !currentStatus
                 
                 return (
@@ -272,8 +376,26 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
                     <button
                       onClick={() => handleDownload(mediaInfo.webpage_url, qualityNumber.toString(), 'video', buttonId)}
                       disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'video')} disabled:opacity-90 min-h-[44px]`}
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'video')} disabled:opacity-90 min-h-[44px] relative overflow-hidden`}
                     >
+                      {/* White Light Loading Effect - Fills during Checking cache AND Downloading */}
+                      {isDownloading && (
+                        <>
+                          <div 
+                            className="absolute inset-0 bg-white/35 dark:bg-white/25 transition-all duration-300 rounded-lg"
+                            style={{ 
+                              width: `${Math.min(progressValue, 99)}%`,
+                            }}
+                          />
+                          <div 
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) ${Math.min(progressValue, 99)}%, transparent 100%)`,
+                            }}
+                          />
+                        </>
+                      )}
+                      {/* Content Layer */}
                       {renderButtonContent(buttonId, isCached, isCached ? 'Download (Cached)' : 'Download')}
                     </button>
                   </div>
@@ -290,6 +412,7 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
                 const buttonId = `audio_${format.format_id}`
                 const isDownloading = downloadingId === buttonId
                 const currentStatus = buttonStatus[buttonId]
+                const progressValue = progress[buttonId] || 0
                 const showCachedBadge = isCached && !currentStatus
                 
                 return (
@@ -317,8 +440,26 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
                     <button
                       onClick={() => handleDownload(mediaInfo.webpage_url, 'audio', 'audio', buttonId)}
                       disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'audio')} disabled:opacity-90 min-h-[44px]`}
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'audio')} disabled:opacity-90 min-h-[44px] relative overflow-hidden`}
                     >
+                      {/* White Light Loading Effect - Fills during Checking cache AND Downloading */}
+                      {isDownloading && (
+                        <>
+                          <div 
+                            className="absolute inset-0 bg-white/35 dark:bg-white/25 transition-all duration-300 rounded-lg"
+                            style={{ 
+                              width: `${Math.min(progressValue, 99)}%`,
+                            }}
+                          />
+                          <div 
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) ${Math.min(progressValue, 99)}%, transparent 100%)`,
+                            }}
+                          />
+                        </>
+                      )}
+                      {/* Content Layer */}
                       {renderButtonContent(buttonId, isCached, isCached ? 'Download MP3 (Cached)' : 'Download MP3')}
                     </button>
                   </div>
