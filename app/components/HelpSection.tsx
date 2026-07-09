@@ -1,8 +1,6 @@
-//app/components/HelpSection.tsx
-
 'use client'
 
-import { FaVideo, FaMusic, FaImage, FaLink, FaDownload } from 'react-icons/fa'
+import { FaVideo, FaMusic, FaImage, FaLink, FaDownload, FaReddit } from 'react-icons/fa'
 
 const steps = [
   {
@@ -55,13 +53,51 @@ export default function HelpSection() {
         ))}
       </div>
 
+      {/* Platform-Specific Tips */}
+      <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Reddit Tip */}
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FaReddit className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            <h3 className="font-semibold text-gray-900 dark:text-white">🔴 Reddit Videos</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Always paste the <strong>Reddit post page URL</strong>, not the direct video link.
+          </p>
+          <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono text-gray-600 dark:text-gray-400 break-all">
+            ✅ https://www.reddit.com/r/videos/comments/123456/...
+          </div>
+          <div className="mt-1 p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs font-mono text-red-600 dark:text-red-400 break-all line-through">
+            ❌ https://packaged-media.redd.it/...
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            💡 Direct Reddit links expire quickly. The page URL works every time!
+          </p>
+        </div>
+
+        {/* General Tip */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FaDownload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h3 className="font-semibold text-gray-900 dark:text-white">💡 Pro Tips</h3>
+          </div>
+          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+            <li>• Use the <strong>page URL</strong> (not direct video links) for best results</li>
+            <li>• For highest quality, choose <strong>4K or 8K</strong> if available</li>
+            <li>• Download audio in <strong>320kbps</strong> for the best sound quality</li>
+            <li>• Cached downloads are <strong>instant</strong> - look for the ⚡ badge</li>
+          </ul>
+        </div>
+      </div>
+
       <div className="mt-12 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">💡 Tips for Best Results</h3>
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">⚠️ Important: Use Page URLs</h3>
         <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 space-y-1">
-          <li>Make sure the URL is publicly accessible</li>
-          <li>For highest quality, choose 4K or 8K if available</li>
-          <li>Download audio in 320kbps for the best sound quality</li>
-          <li>Thumbnails are automatically extracted in high resolution</li>
+          <li>For <strong>Reddit</strong>: Use the post page URL, not the direct video link</li>
+          <li>For <strong>YouTube</strong>: Use the watch page URL or share link</li>
+          <li>For <strong>Instagram</strong>: Use the post or reel URL</li>
+          <li>For <strong>TikTok</strong>: Use the video page URL or share link</li>
+          <li>Direct video links often <strong>expire</strong> or require special handling</li>
         </ul>
       </div>
     </section>

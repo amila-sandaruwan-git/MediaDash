@@ -15,7 +15,7 @@ export default function Home() {
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null)
   const [cacheInfo, setCacheInfo] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; suggestion?: string } | null>(null)
 
   const handleConvert = async (url: string) => {
     setIsLoading(true)
@@ -33,10 +33,17 @@ export default function Home() {
           document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })
         }, 200)
       } else {
-        setError(response.data.message || 'Failed to process the URL')
+        setError({
+          message: response.data.message || 'Failed to process the URL',
+          suggestion: response.data.suggestion
+        })
       }
-    } catch (err) {
-      setError('An error occurred while processing your request. Please try again.')
+    } catch (err: any) {
+      const errorData = err.response?.data
+      setError({
+        message: errorData?.message || 'An error occurred while processing your request.',
+        suggestion: errorData?.suggestion
+      })
       console.error(err)
     } finally {
       setIsLoading(false)
@@ -52,8 +59,13 @@ export default function Home() {
         
         {error && (
           <div className="max-w-3xl mx-auto px-4 -mt-8">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
-              {error}
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-red-700 dark:text-red-400">{error.message}</p>
+              {error.suggestion && (
+                <p className="text-sm text-red-600 dark:text-red-300 mt-2">
+                  💡 {error.suggestion}
+                </p>
+              )}
             </div>
           </div>
         )}
