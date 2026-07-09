@@ -1,5 +1,3 @@
-// app/components/ThemeProvider.tsx
-
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
@@ -14,20 +12,24 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>('light') // 👈 DEFAULT TO LIGHT
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    
+    // Check if user has a saved preference
     const savedTheme = localStorage.getItem('theme') as Theme | null
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     
     if (savedTheme) {
+      // If they have a saved preference, use it
       setTheme(savedTheme)
       document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-    } else if (prefersDark) {
-      setTheme('dark')
-      document.documentElement.classList.add('dark')
+    } else {
+      // 👈 FORCE LIGHT MODE BY DEFAULT (ignore system preference)
+      setTheme('light')
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
     }
   }, [])
 
