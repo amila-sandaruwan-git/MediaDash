@@ -1,3 +1,5 @@
+// app/components/Navbar.tsx
+
 'use client'
 
 import Link from 'next/link'
@@ -60,7 +62,7 @@ export default function Navbar() {
                 MediaDash
               </span>
               <span className="hidden sm:inline text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                v1.0
+                {/*v1.0 */}
               </span>
             </Link>
           </div>

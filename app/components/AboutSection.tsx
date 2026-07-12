@@ -1,3 +1,5 @@
+// app/components/AboutSection.tsx
+
 'use client'
 
 import { 
