@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  // ❌ Comment this out or remove it
+  // output: 'export',
+  
   images: {
+    domains: ['i.ytimg.com', 'img.youtube.com'],
     unoptimized: true,
   },
   trailingSlash: true,
