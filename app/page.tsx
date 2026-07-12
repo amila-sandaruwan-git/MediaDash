@@ -8,6 +8,7 @@ import AboutSection from './components/AboutSection'
 import HelpSection from './components/HelpSection'
 import InstallSection from './components/InstallSection'
 import Footer from './components/Footer'
+import ScrollToTop from './components/ScrollToTop'  // 👈 ADD THIS
 import { MediaInfo } from './types'
 import axios from 'axios'
 
@@ -76,6 +77,9 @@ export default function Home() {
         <HelpSection />
         <InstallSection />
         <Footer />
+
+        {/* 👈 ADD SCROLL TO TOP HERE */}
+        <ScrollToTop />
       </div>
     </main>
   )

@@ -272,7 +272,7 @@ export default function AboutSection() {
         </p>
         <div className="flex justify-center space-x-4">
           <a 
-            href="#" 
+            href="https://github.com/amila-sandaruwan-git" 
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-800 dark:bg-gray-700 text-white rounded-xl hover:bg-gray-700 dark:hover:bg-gray-600 transition-all duration-300 hover:scale-105 shadow-md"
           >
             <FaGithub />
