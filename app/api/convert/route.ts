@@ -1,18 +1,19 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+// app/api/convert/route.ts
+// This works for both web and desktop app
 
 import { NextRequest, NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { MediaInfo, VideoFormat, AudioFormat } from '../../types'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { randomUUID } from 'crypto'
-import { cacheManager } from '../../lib/cache'
 
 const execPromise = promisify(exec)
 
-// Helper function to format file size
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -21,7 +22,23 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// Helper to check if yt-dlp is installed
+function calculateAudioSize(bitrateKbps: number, durationSeconds: number): number {
+  if (durationSeconds <= 0) return 0
+  return Math.round((bitrateKbps * durationSeconds) / 8 * 1024)
+}
+
+function estimateVideoSize(height: number, durationSeconds: number): number {
+  if (durationSeconds <= 0) return 0
+  let estimatedBitrate = 0
+  if (height >= 4320) estimatedBitrate = 40000
+  else if (height >= 2160) estimatedBitrate = 20000
+  else if (height >= 1080) estimatedBitrate = 8000
+  else if (height >= 720) estimatedBitrate = 4000
+  else if (height >= 480) estimatedBitrate = 1500
+  else estimatedBitrate = 800
+  return Math.round((estimatedBitrate * durationSeconds) / 8 * 1024)
+}
+
 async function checkYtDlpInstalled(): Promise<boolean> {
   try {
     await execPromise('yt-dlp --version')
@@ -31,27 +48,19 @@ async function checkYtDlpInstalled(): Promise<boolean> {
   }
 }
 
-// URL type detection
 function getUrlType(url: string): 'page' | 'direct' | 'unknown' {
-  // Check if it's a direct video/audio file or streaming manifest
   if (url.match(/\.(mp4|webm|mov|avi|mkv|m3u8|mpd)(\?.*)?$/i)) {
     return 'direct'
   }
-  
-  // Check if it's a Reddit page URL
   if (url.match(/reddit\.com\/r\/.*\/comments\/|redd\.it\//i)) {
     return 'page'
   }
-  
-  // Check for other platform page URLs
   if (url.match(/youtube\.com\/watch|youtu\.be|facebook\.com\/watch|instagram\.com\/p|tiktok\.com\/@|twitter\.com\/.*\/status|x\.com\/.*\/status/i)) {
     return 'page'
   }
-  
   return 'unknown'
 }
 
-// Get platform name from URL
 function getPlatformName(url: string): string {
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube'
   if (url.includes('reddit.com') || url.includes('redd.it')) return 'Reddit'
@@ -68,9 +77,13 @@ function getPlatformName(url: string): string {
   return 'Unknown Platform'
 }
 
+// ============================================
+// MAIN POST HANDLER
+// ============================================
+
 export async function POST(request: NextRequest) {
   try {
-    const { url, action, formatId, quality } = await request.json()
+    const { url, action, formatId, quality, type } = await request.json()
 
     // Check if yt-dlp is installed
     const isInstalled = await checkYtDlpInstalled()
@@ -78,82 +91,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          message: 'yt-dlp is not installed. Please install it first.' 
+          message: 'yt-dlp is not installed. Please install it first.',
+          details: 'Download from: https://github.com/yt-dlp/yt-dlp/releases/latest'
         },
         { status: 500 }
       )
     }
 
-    // --- URL VALIDATION FOR DIRECT LINKS ---
     const urlType = getUrlType(url)
     const platform = getPlatformName(url)
 
-    // Special handling for Reddit direct links
+    // Reddit direct link handling
     if (urlType === 'direct' && (url.includes('redd.it') || url.includes('reddit.com'))) {
       return NextResponse.json({
         success: false,
-        message: '❌ Direct Reddit video links often expire and cannot be downloaded reliably.',
-        suggestion: 'Please paste the Reddit post page URL instead:',
-        example: 'Example: https://www.reddit.com/r/[subreddit]/comments/[post_id]/[title]/',
+        message: '❌ Direct Reddit video links often expire.',
+        suggestion: 'Please paste the Reddit post page URL instead.',
         platform: 'Reddit'
       }, { status: 400 })
     }
 
-    // Special handling for other direct video links
     if (urlType === 'direct') {
-      // Check if it's a direct video link that might work
       const urlObj = new URL(url)
       const pathname = urlObj.pathname.toLowerCase()
-      
-      // If it's a direct MP4/WebM file, it might work directly
-      if (pathname.match(/\.(mp4|webm|mov|avi|mkv)$/)) {
-        // Let it proceed - yt-dlp might handle it
-        console.log(`Direct video link detected: ${url}`)
-      } else {
-        // For other direct links, suggest using page URL
+      if (!pathname.match(/\.(mp4|webm|mov|avi|mkv)$/)) {
         return NextResponse.json({
           success: false,
           message: `⚠️ This appears to be a direct media link from ${platform}.`,
-          suggestion: 'For best results, use the page URL instead of the direct video link.',
+          suggestion: 'Use the page URL instead of the direct video link.',
           platform: platform
         }, { status: 400 })
       }
     }
 
-    // If this is a download request
+    // ============================================
+    // DOWNLOAD ACTION
+    // ============================================
     if (action === 'download') {
       if (!url || !formatId) {
         return NextResponse.json(
-          { success: false, message: 'URL and format ID are required for download' },
+          { success: false, message: 'URL and format ID are required' },
           { status: 400 }
         )
       }
 
-      const isAudio = quality === 'audio'
-      const cacheKey = isAudio ? 'audio' : `${quality}p`
-
-      // --- CHECK CACHE FIRST ---
-      console.log(`[Cache] Checking cache for: ${url} (${cacheKey})`)
-      const cached = await cacheManager.getFromCache(url, cacheKey, isAudio ? 'audio' : 'video')
-      
-      if (cached) {
-        console.log(`[Cache] ✅ Cache hit! Serving from cache: ${cacheKey}`)
-        const uint8Array = new Uint8Array(cached.buffer)
-        return new NextResponse(uint8Array, {
-          status: 200,
-          headers: {
-            'Content-Disposition': `attachment; filename="${cached.metadata.filename}"`,
-            'Content-Type': cached.metadata.mimeType,
-            'Content-Length': cached.buffer.length.toString(),
-            'X-Cache-Status': 'HIT',
-            'X-Cache-Size': formatFileSize(cached.buffer.length),
-          },
-        })
-      }
-
-      console.log(`[Cache] ❌ Cache miss. Downloading: ${cacheKey}`)
-
-      // --- NOT IN CACHE - DOWNLOAD ---
+      const isAudio = type === 'audio' || quality === 'audio'
       const filename = `${randomUUID()}_${Date.now()}`
       const outputPath = path.join(process.cwd(), 'tmp', filename)
       
@@ -163,22 +145,25 @@ export async function POST(request: NextRequest) {
       let fileExtension: string = 'mp4'
       let mimeType: string = 'video/mp4'
 
-      // Special handling for Reddit - use page URL if it's a direct link
       let downloadUrl = url
       if (urlType === 'direct' && (url.includes('redd.it') || url.includes('reddit.com'))) {
-        // This should not happen due to earlier check, but just in case
         throw new Error('Please use the Reddit page URL instead of direct video link')
       }
 
-      if (isAudio) {
-        fileExtension = 'mp3'
-        mimeType = 'audio/mpeg'
-        downloadCommand = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --extract-audio --audio-format mp3 --audio-quality 320K -o "${outputPath}.%(ext)s" "${downloadUrl}"`
-      } else {
-        const height = parseInt(quality) || 720
-        downloadCommand = `yt-dlp -f "bestvideo[height<=${height}]+bestaudio[ext=m4a]/best[height<=${height}]" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+      if (!isAudio) {
+        // VIDEO DOWNLOAD - Use exact format ID
+        downloadCommand = `yt-dlp -f "${formatId}+bestaudio[ext=m4a]/bestaudio/best" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${downloadUrl}"`
         fileExtension = 'mp4'
         mimeType = 'video/mp4'
+        console.log(`[API] Downloading video format ID: ${formatId}`)
+      } else {
+        // AUDIO DOWNLOAD
+        fileExtension = 'mp3'
+        mimeType = 'audio/mpeg'
+        const bitrateMatch = quality.match(/(\d+)/)
+        const bitrate = bitrateMatch ? bitrateMatch[0] : '192'
+        downloadCommand = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --extract-audio --audio-format mp3 --audio-quality ${bitrate}K -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+        console.log(`[API] Audio bitrate selected: ${bitrate}kbps`)
       }
 
       console.log('Executing download command:', downloadCommand)
@@ -210,22 +195,7 @@ export async function POST(request: NextRequest) {
       else if (ext === 'mkv') mimeType = 'video/x-matroska'
       else if (ext === 'mp4') mimeType = 'video/mp4'
 
-      // --- SAVE TO CACHE ---
-      try {
-        console.log(`[Cache] Saving ${cacheKey} to cache...`)
-        await cacheManager.saveToCache(
-          url,
-          cacheKey,
-          isAudio ? 'audio' : 'video',
-          fileBuffer,
-          ext,
-          mimeType
-        )
-        console.log(`[Cache] ✅ Saved to cache: ${cacheKey}`)
-      } catch (cacheError) {
-        console.error('[Cache] Failed to save to cache:', cacheError)
-      }
-      
+      // Clean up temp file
       await fs.unlink(filePath).catch(() => {})
 
       const uint8Array = new Uint8Array(fileBuffer)
@@ -235,110 +205,227 @@ export async function POST(request: NextRequest) {
           'Content-Disposition': `attachment; filename="media.${ext}"`,
           'Content-Type': mimeType,
           'Content-Length': fileStats.size.toString(),
-          'X-Cache-Status': 'MISS',
-          'X-Cache-Size': formatFileSize(fileStats.size),
         },
       })
 
+    // ============================================
+    // INFO ACTION
+    // ============================================
     } else {
-      // --- GET INFO ONLY ---
       console.log('Fetching info for URL:', url)
       
-      const command = `yt-dlp --dump-json --no-playlist --skip-download "${url}"`
+      const command = `yt-dlp --dump-json --no-playlist --skip-download --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`
       
       const { stdout, stderr } = await execPromise(command)
 
-      if (stderr && !stderr.includes('WARNING')) {
+      if (stderr && !stderr.includes('WARNING') && !stderr.includes('Failed to download')) {
         console.error('yt-dlp stderr:', stderr)
       }
 
       const data = JSON.parse(stdout)
 
-      const videoFormats: VideoFormat[] = data.formats
-        .filter((f: any) => f.vcodec !== 'none')
-        .map((f: any) => ({
-          format_id: f.format_id,
-          resolution: f.resolution || `${f.height || 0}p`,
-          quality: f.quality_label || f.format_note || 'Standard',
-          filesize: f.filesize || f.filesize_approx || 0,
-          ext: f.ext,
-          url: f.url || ''
-        }))
-        .filter((f: VideoFormat) => f.url)
-        .sort((a: VideoFormat, b: VideoFormat) => {
-          const aHeight = parseInt(a.resolution) || 0
-          const bHeight = parseInt(b.resolution) || 0
-          return bHeight - aHeight
-        })
+      const duration = data.duration || 0
+      console.log(`[API] Title: ${data.title}`)
 
-      const audioFormats: AudioFormat[] = data.formats
-        .filter((f: any) => f.acodec !== 'none' && f.vcodec === 'none')
-        .map((f: any) => ({
-          format_id: f.format_id,
-          bitrate: f.abr ? `${f.abr}kbps` : f.tbr ? `${f.tbr}kbps` : '128kbps',
-          filesize: f.filesize || f.filesize_approx || 0,
-          ext: f.ext,
-          url: f.url || ''
-        }))
-        .filter((f: AudioFormat) => f.url)
-        .sort((a: AudioFormat, b: AudioFormat) => {
-          const aBitrate = parseInt(a.bitrate) || 0
-          const bBitrate = parseInt(b.bitrate) || 0
-          return bBitrate - aBitrate
+      // ============================================
+      // VIDEO FORMATS - SHOW ALL AVAILABLE
+      // ============================================
+      const allVideoFormats = data.formats
+        .filter((f: any) => {
+          return f.vcodec !== 'none' && f.height && f.height > 0 && (f.url || f.manifest_url)
         })
+        .map((f: any) => {
+          let codecInfo = ''
+          if (f.vcodec) {
+            if (f.vcodec.includes('av01')) codecInfo = 'AV1'
+            else if (f.vcodec.includes('vp09')) codecInfo = 'VP9'
+            else if (f.vcodec.includes('avc')) codecInfo = 'AVC'
+            else if (f.vcodec.includes('h264')) codecInfo = 'H.264'
+            else if (f.vcodec.includes('hevc')) codecInfo = 'HEVC'
+          }
+          
+          const hasAudio = f.acodec !== 'none'
+          let qualityLabel = f.quality_label || f.format_note || codecInfo || 'Standard'
+          if (!hasAudio) {
+            qualityLabel = `${qualityLabel} (Video Only)`
+          }
+          
+          let filesize = f.filesize || f.filesize_approx || 0
+          if (filesize === 0 && duration > 0) {
+            filesize = estimateVideoSize(f.height, duration)
+          }
+          
+          return {
+            format_id: f.format_id,
+            height: f.height,
+            resolution: `${f.height}p`,
+            quality: qualityLabel,
+            filesize: filesize,
+            ext: f.ext || 'mp4',
+            url: f.url || f.manifest_url || '',
+            hasAudio: hasAudio,
+            priority: hasAudio ? 0 : 1
+          }
+        })
+        .filter((f: any) => f.url && f.url.length > 0)
 
-      // Check which formats are cached
-      const cachedFormats = new Set()
-      for (const format of videoFormats) {
-        const resMatch = format.resolution.match(/(\d+)/)
-        if (resMatch) {
-          const isCached = await cacheManager.isCached(url, `${resMatch[0]}p`, 'video')
-          if (isCached) cachedFormats.add(resMatch[0])
+      // Deduplicate by resolution
+      const groupedByHeight = new Map()
+      for (const format of allVideoFormats) {
+        const height = format.height
+        if (!groupedByHeight.has(height)) {
+          groupedByHeight.set(height, format)
+        } else {
+          const existing = groupedByHeight.get(height)
+          if (format.priority < existing.priority) {
+            groupedByHeight.set(height, format)
+          } else if (format.priority === existing.priority) {
+            const extPreference = (ext: string) => {
+              if (ext === 'mp4') return 0
+              if (ext === 'webm') return 1
+              return 2
+            }
+            if (extPreference(format.ext) < extPreference(existing.ext)) {
+              groupedByHeight.set(height, format)
+            }
+          }
         }
       }
 
-      const mediaInfo: MediaInfo = {
+      const videoFormats = Array.from(groupedByHeight.values())
+        .map((f: any) => ({
+          format_id: f.format_id,
+          resolution: f.resolution,
+          quality: f.quality,
+          filesize: f.filesize,
+          ext: f.ext,
+          url: f.url,
+        }))
+        .sort((a, b) => {
+          const aHeight = parseInt(a.resolution.match(/(\d+)/)?.[0] || '0')
+          const bHeight = parseInt(b.resolution.match(/(\d+)/)?.[0] || '0')
+          return aHeight - bHeight
+        })
+
+      // ============================================
+      // AUDIO FORMATS
+      // ============================================
+      const standardBitrates = [
+        { bitrate: 128, label: '128 kbps', quality: 'Standard Quality' },
+        { bitrate: 192, label: '192 kbps', quality: 'Medium Quality' },
+        { bitrate: 256, label: '256 kbps', quality: 'High Quality' },
+        { bitrate: 320, label: '320 kbps', quality: 'Maximum MP3 Quality' },
+      ]
+      
+      const audioFormatsFromData = data.formats
+        .filter((f: any) => {
+          return f.acodec !== 'none' && (f.abr !== null && f.abr !== undefined || f.tbr !== null && f.tbr !== undefined)
+        })
+        .map((f: any) => {
+          let bitrate = 128
+          if (f.abr && f.abr > 0) bitrate = Math.round(f.abr)
+          else if (f.tbr && f.tbr > 0) bitrate = Math.round(f.tbr)
+          
+          let roundedBitrate = 128
+          if (bitrate >= 300) roundedBitrate = 320
+          else if (bitrate >= 220) roundedBitrate = 256
+          else if (bitrate >= 160) roundedBitrate = 192
+          else roundedBitrate = 128
+          
+          let filesize = f.filesize || f.filesize_approx || 0
+          if (filesize === 0 && duration > 0) {
+            filesize = calculateAudioSize(roundedBitrate, duration)
+          }
+          
+          return {
+            format_id: f.format_id,
+            bitrate: roundedBitrate,
+            filesize: filesize,
+            ext: f.ext || 'mp3',
+            url: f.url || f.manifest_url || ''
+          }
+        })
+        .filter((f: any) => f.url && f.url.length > 0)
+
+      const finalAudioFormats = []
+      const groupedByBitrate: Record<number, any[]> = {}
+      
+      for (const format of audioFormatsFromData) {
+        if (!groupedByBitrate[format.bitrate]) {
+          groupedByBitrate[format.bitrate] = []
+        }
+        groupedByBitrate[format.bitrate].push(format)
+      }
+
+      for (const stdBitrate of standardBitrates) {
+        let bestFormat = null
+        let bestSize = 0
+        
+        if (groupedByBitrate[stdBitrate.bitrate]) {
+          for (const f of groupedByBitrate[stdBitrate.bitrate]) {
+            if (f.filesize > bestSize) {
+              bestSize = f.filesize
+              bestFormat = f
+            }
+          }
+        }
+        
+        let finalSize = 0
+        if (bestFormat && bestFormat.filesize > 0) {
+          finalSize = bestFormat.filesize
+        } else if (duration > 0) {
+          finalSize = calculateAudioSize(stdBitrate.bitrate, duration)
+        }
+        
+        finalAudioFormats.push({
+          format_id: bestFormat?.format_id || `audio_${stdBitrate.bitrate}`,
+          bitrate: `${stdBitrate.bitrate}kbps`,
+          filesize: finalSize,
+          ext: bestFormat?.ext || 'mp3',
+          url: bestFormat?.url || ''
+        })
+      }
+      
+      const sortedAudioFormats = finalAudioFormats.sort((a, b) => {
+        const aBitrate = parseInt(a.bitrate.match(/(\d+)/)?.[0] || '0')
+        const bBitrate = parseInt(b.bitrate.match(/(\d+)/)?.[0] || '0')
+        return aBitrate - bBitrate
+      })
+
+      const mediaInfo = {
         title: data.title || 'Untitled',
         thumbnail: data.thumbnail || '',
         duration: data.duration || 0,
         video_formats: videoFormats,
-        audio_formats: audioFormats,
+        audio_formats: sortedAudioFormats,
         webpage_url: data.webpage_url || url
       }
 
       return NextResponse.json({
         success: true,
         data: mediaInfo,
-        cacheInfo: {
-          cachedFormats: Array.from(cachedFormats),
-          cacheSize: await cacheManager.getCacheSizeMB(),
-          isAudioCached: await cacheManager.isCached(url, 'audio', 'audio'),
-        }
       })
     }
 
   } catch (error: any) {
     console.error('Error:', error)
     
-    let errorMessage = 'Failed to process the URL. Please check the URL and try again.'
+    let errorMessage = 'Failed to process the URL. Please try again.'
     let suggestion = ''
     
-    if (error.message?.includes('ERROR: Unsupported URL')) {
+    if (error.message?.includes('Unsupported URL')) {
       errorMessage = 'Unsupported URL. Please use a link from a supported platform.'
-      suggestion = 'Supported platforms: YouTube, Facebook, Instagram, TikTok, Twitter/X, Reddit, LinkedIn, and more.'
-    } else if (error.message?.includes('ERROR: Video unavailable')) {
-      errorMessage = 'Video is unavailable or private. Please check the URL.'
-      suggestion = 'Make sure the video is publicly accessible and the URL is correct.'
-    } else if (error.message?.includes('ERROR: This video is private')) {
-      errorMessage = 'This video is private. Please use a public video URL.'
-    } else if (error.message?.includes('ERROR: File not found')) {
-      errorMessage = 'The requested file could not be found. Try a different quality.'
-    } else if (error.message?.includes('ERROR: Unsupported URL') && error.message?.includes('reddit')) {
-      errorMessage = '❌ Direct Reddit video links are not supported.'
-      suggestion = 'Please paste the Reddit post page URL instead (e.g., https://www.reddit.com/r/.../comments/...)'
-    } else if (error.message?.includes('ERROR: DASH manifest')) {
-      errorMessage = 'This is a streaming video that requires special handling.'
-      suggestion = 'Please use the page URL instead of the direct video link.'
+    } else if (error.message?.includes('Video unavailable') || error.message?.includes('404')) {
+      errorMessage = 'Video is unavailable or private.'
+      suggestion = 'Make sure the video is publicly accessible.'
+    } else if (error.message?.includes('This video is private')) {
+      errorMessage = 'This video is private.'
+    } else if (error.message?.includes('age-restricted')) {
+      errorMessage = '⚠️ This video is age-restricted.'
+      suggestion = 'Try a different video that is not age-restricted.'
+    } else if (error.message?.includes('Login required')) {
+      errorMessage = '⚠️ This video requires login.'
+      suggestion = 'Try a public video that does not require login.'
     }
 
     return NextResponse.json(

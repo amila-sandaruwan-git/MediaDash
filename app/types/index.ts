@@ -1,3 +1,5 @@
+// app/types/index.ts
+
 export interface VideoFormat {
   format_id: string
   resolution: string

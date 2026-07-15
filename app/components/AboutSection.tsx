@@ -257,41 +257,7 @@ export default function AboutSection() {
       </div>
 
       {/* Community */}
-      <div className="text-center bg-white dark:bg-gray-800/50 rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
-        <div className="flex justify-center mb-4">
-          <div className="flex space-x-3">
-            <FaUsers className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            <FaHeart className="w-6 h-6 text-red-500 dark:text-red-400" />
-            <FaStar className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
-            <FaAward className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          </div>
-        </div>
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Join the MediaDash Community
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
-          MediaDash is completely free and open source. We believe in making media accessible to everyone.
-        </p>
-        <div className="flex justify-center space-x-4">
-          <a 
-            href="https://github.com/amila-sandaruwan-git" 
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-800 dark:bg-gray-700 text-white rounded-xl hover:bg-gray-700 dark:hover:bg-gray-600 transition-all duration-300 hover:scale-105 shadow-md"
-          >
-            <FaGithub />
-            GitHub
-          </a>
-          <a 
-            href="#" 
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300 hover:scale-105 shadow-md"
-          >
-            <FaGlobe />
-            Website
-          </a>
-        </div>
-        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-          Made with ❤️ for content creators everywhere
-        </p>
-      </div>
+  
     </section>
   )
 }

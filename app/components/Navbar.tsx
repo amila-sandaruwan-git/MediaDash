@@ -62,7 +62,7 @@ export default function Navbar() {
                 MediaDash
               </span>
               <span className="hidden sm:inline text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                {/*v1.0 */}
+                v1.0
               </span>
             </Link>
           </div>
@@ -81,13 +81,7 @@ export default function Navbar() {
             >
               Help
             </button>
-            <button 
-              onClick={() => scrollToSection('install')}
-              className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors hover:scale-105 transform duration-200"
-            >
-              <FaDownload className="text-sm" />
-              <span>Install</span>
-            </button>
+            
           </div>
 
           {/* Right side - Dark Mode Toggle */}

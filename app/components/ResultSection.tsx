@@ -1,52 +1,100 @@
 'use client'
 
 import { MediaInfo, VideoFormat, AudioFormat } from '../types'
-import { FaDownload, FaVideo, FaMusic, FaImage, FaSpinner, FaClock, FaCheck } from 'react-icons/fa'
+import { FaDownload, FaVideo, FaMusic, FaImage, FaSpinner } from 'react-icons/fa'
 import { useState } from 'react'
 
 interface ResultSectionProps {
   mediaInfo: MediaInfo | null
-  cacheInfo?: {
-    cachedFormats: string[]
-    cacheSize: number
-    isAudioCached: boolean
-  }
 }
 
-export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionProps) {
+export default function ResultSection({ mediaInfo }: ResultSectionProps) {
   const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'thumbnail'>('video')
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [buttonStatus, setButtonStatus] = useState<Record<string, string>>({})
-  const [progress, setProgress] = useState<Record<string, number>>({})
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
   if (!mediaInfo) return null
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return 'Unknown'
+  // ============================================
+  // VIDEO RESOLUTION CONFIGURATION - FOR LABELS ONLY
+  // ============================================
+  const videoQualityConfigs: Record<string, { label: string; pixelSize: string; quality: string }> = {
+    '144': { label: '144p', pixelSize: '256x144', quality: 'Low' },
+    '240': { label: '240p', pixelSize: '426x240', quality: 'Low' },
+    '360': { label: '360p', pixelSize: '640x360', quality: 'SD (Standard Definition)' },
+    '480': { label: '480p', pixelSize: '640x480', quality: 'SD (Standard Definition)' },
+    '720': { label: '720p', pixelSize: '1280x720', quality: 'HD (High Definition)' },
+    '1080': { label: '1080p', pixelSize: '1920x1080', quality: 'Full HD (FHD)' },
+    '1440': { label: '1440p', pixelSize: '2560x1440', quality: '2K (Quad HD)' },
+    '2160': { label: '2160p', pixelSize: '3840x2160', quality: '4K or Ultra HD (UHD)' },
+    '4320': { label: '4320p', pixelSize: '7680x4320', quality: '8K (Full Ultra HD)' },
+  }
+
+  // ============================================
+  // AUDIO BITRATE CONFIGURATION
+  // ============================================
+  const audioQualityConfigs: Record<string, { label: string; quality: string }> = {
+    '128': { label: '128 kbps', quality: 'Standard Quality' },
+    '192': { label: '192 kbps', quality: 'Medium Quality' },
+    '256': { label: '256 kbps', quality: 'High Quality' },
+    '320': { label: '320 kbps', quality: 'Maximum MP3 Quality' },
+  }
+
+  // ============================================
+  // FORMAT FILE SIZE
+  // ============================================
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return 'Size unknown'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(2))
+    return `${size} ${sizes[i]}`
   }
 
-  const handleDownload = async (url: string, quality: string, type: 'video' | 'audio', buttonId: string) => {
+  // ============================================
+  // GET VIDEO QUALITY INFO - RETURNS LABEL OR FALLBACK
+  // ============================================
+  const getVideoQualityInfo = (resolution: string) => {
+    const match = resolution.match(/(\d+)/)
+    if (!match) return null
+    const res = match[0]
+    return videoQualityConfigs[res] || {
+      label: resolution,
+      pixelSize: '',
+      quality: 'Available'
+    }
+  }
+
+  // ============================================
+  // GET AUDIO QUALITY INFO
+  // ============================================
+  const getAudioQualityInfo = (bitrate: string) => {
+    const match = bitrate.match(/(\d+)/)
+    if (!match) return null
+    const rate = match[0]
+    return audioQualityConfigs[rate] || null
+  }
+
+  // ============================================
+  // DOWNLOAD HANDLER - SENDS ACTUAL FORMAT ID
+  // ============================================
+  const handleDownload = async (url: string, formatId: string, quality: string, type: 'video' | 'audio', buttonId: string) => {
     try {
       setDownloadingId(buttonId)
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Checking cache...' }))
-      setProgress(prev => ({ ...prev, [buttonId]: 0 }))
       setDownloadError(null)
 
-      // Simulate progress during cache check (0-30%)
-      let progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const current = prev[buttonId] || 0
-          if (current < 30) {
-            return { ...prev, [buttonId]: current + Math.random() * 2 + 1 }
-          }
-          return prev
-        })
-      }, 100)
+      let qualityValue: string
+      let formatIdValue: string
+      
+      if (type === 'audio') {
+        qualityValue = `${quality}kbps`
+        formatIdValue = 'bestaudio'
+      } else {
+        // For video, send the actual format ID (e.g., '137', '248', '399')
+        qualityValue = quality
+        formatIdValue = formatId // This is the actual yt-dlp format ID!
+      }
 
       const response = await fetch('/api/convert', {
         method: 'POST',
@@ -56,96 +104,18 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
         body: JSON.stringify({
           url: mediaInfo.webpage_url,
           action: 'download',
-          formatId: quality === 'audio' ? 'bestaudio' : quality,
-          quality: type === 'audio' ? 'audio' : quality,
+          formatId: formatIdValue,
+          quality: qualityValue,
+          type: type,
         }),
       })
-
-      clearInterval(progressInterval)
 
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || 'Download failed')
       }
 
-      // Check if it's a cached response
-      const cacheStatus = response.headers.get('X-Cache-Status')
-      if (cacheStatus === 'HIT') {
-        setProgress(prev => ({ ...prev, [buttonId]: 100 }))
-        setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! ⚡' }))
-        
-        const blob = await response.blob()
-        const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
-        
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(link.href)
-
-        setTimeout(() => {
-          setButtonStatus(prev => {
-            const newStatus = { ...prev }
-            delete newStatus[buttonId]
-            return newStatus
-          })
-          setProgress(prev => {
-            const newProgress = { ...prev }
-            delete newProgress[buttonId]
-            return newProgress
-          })
-          setDownloadingId(null)
-        }, 2500)
-        return
-      }
-
-      // --- REAL DOWNLOAD PROGRESS ---
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Downloading...' }))
-      
-      const contentLength = parseInt(response.headers.get('Content-Length') || '0')
-
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error('Failed to read response stream')
-      }
-
-      const chunks: Uint8Array[] = []
-      let receivedLength = 0
-      
-      // Continue progress from where it left off (30%)
-      setProgress(prev => ({ ...prev, [buttonId]: 30 }))
-
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) {
-          break
-        }
-
-        receivedLength += value.length
-        chunks.push(value)
-
-        // Calculate progress percentage (30-100%)
-        let percent = 30
-        if (contentLength > 0) {
-          percent = 30 + ((receivedLength / contentLength) * 70)
-          percent = Math.min(99, percent)
-        } else {
-          const chunkProgress = 30 + (chunks.length * 1.5)
-          percent = Math.min(99, chunkProgress)
-        }
-        
-        setProgress(prev => ({ ...prev, [buttonId]: percent }))
-      }
-
-      // Download complete
-      setProgress(prev => ({ ...prev, [buttonId]: 100 }))
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Complete! 🎉' }))
-      
-      const blob = new Blob(chunks as BlobPart[])
-      
+      const blob = await response.blob()
       const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
       
       const link = document.createElement('a')
@@ -154,117 +124,17 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      URL.revokeObjectURL(link.href)
+      setTimeout(() => URL.revokeObjectURL(link.href), 100)
 
       setTimeout(() => {
-        setButtonStatus(prev => {
-          const newStatus = { ...prev }
-          delete newStatus[buttonId]
-          return newStatus
-        })
-        setProgress(prev => {
-          const newProgress = { ...prev }
-          delete newProgress[buttonId]
-          return newProgress
-        })
         setDownloadingId(null)
-      }, 3000)
+      }, 600)
 
     } catch (error: any) {
       console.error('Download failed:', error)
-      setButtonStatus(prev => ({ ...prev, [buttonId]: 'Failed! ❌' }))
-      setProgress(prev => ({ ...prev, [buttonId]: 0 }))
       setDownloadError(error.message || 'Download failed. Please try again.')
-      setTimeout(() => {
-        setButtonStatus(prev => {
-          const newStatus = { ...prev }
-          delete newStatus[buttonId]
-          return newStatus
-        })
-        setProgress(prev => {
-          const newProgress = { ...prev }
-          delete newProgress[buttonId]
-          return newProgress
-        })
-        setDownloadingId(null)
-      }, 3000)
+      setDownloadingId(null)
     }
-  }
-
-  const isFormatCached = (quality: string): boolean => {
-    if (!cacheInfo) return false
-    return cacheInfo.cachedFormats.includes(quality)
-  }
-
-  // Render button content
-  const renderButtonContent = (buttonId: string, isCached: boolean, defaultText: string) => {
-    const status = buttonStatus[buttonId]
-    
-    if (status) {
-      if (status.includes('Checking')) {
-        return (
-          <div className="flex items-center justify-center gap-2 w-full relative z-10">
-            <FaSpinner className="animate-spin flex-shrink-0" />
-            <span className="text-xs md:text-sm truncate max-w-[180px]">
-              {status}
-            </span>
-          </div>
-        )
-      }
-      
-      if (status.includes('Downloading')) {
-        return (
-          <div className="flex items-center justify-center gap-2 w-full relative z-10">
-            <FaSpinner className="animate-spin flex-shrink-0" />
-            <span className="text-xs md:text-sm truncate max-w-[200px]">
-              {status}
-            </span>
-          </div>
-        )
-      }
-      
-      if (status.includes('Complete')) {
-        return (
-          <div className="flex items-center justify-center gap-2 w-full relative z-10">
-            <FaCheck className="flex-shrink-0" />
-            <span>{status}</span>
-          </div>
-        )
-      }
-      
-      if (status.includes('Failed')) {
-        return (
-          <div className="flex items-center justify-center gap-2 w-full relative z-10">
-            <span>❌</span>
-            <span>{status}</span>
-          </div>
-        )
-      }
-      
-      return <span>{status}</span>
-    }
-    
-    return (
-      <div className="flex items-center justify-center gap-2 w-full">
-        <FaDownload className="flex-shrink-0" />
-        {defaultText}
-      </div>
-    )
-  }
-
-  // Get button color based on status
-  const getButtonColor = (buttonId: string, isCached: boolean, type: 'video' | 'audio') => {
-    const status = buttonStatus[buttonId]
-    
-    if (status) {
-      if (status.includes('Checking')) return 'bg-blue-600 hover:bg-blue-700'
-      if (status.includes('Downloading')) return 'bg-orange-600 hover:bg-orange-700'
-      if (status.includes('Complete')) return 'bg-green-600 hover:bg-green-700'
-      if (status.includes('Failed')) return 'bg-red-600 hover:bg-red-700'
-    }
-    
-    if (isCached) return 'bg-green-600 hover:bg-green-700'
-    return type === 'video' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'
   }
 
   return (
@@ -335,68 +205,82 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
 
         {/* Content */}
         <div className="p-6">
+          {/* ============================================
+              VIDEO SECTION - SHOW ALL FORMATS
+              ============================================ */}
           {activeTab === 'video' && mediaInfo.video_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {mediaInfo.video_formats.map((format: VideoFormat) => {
-                const resolutionMatch = format.resolution.match(/(\d+)/)
-                const qualityNumber = resolutionMatch ? parseInt(resolutionMatch[0]) : 720
-                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
-                const isCached = isFormatCached(format.resolution)
+                // 🔥 FIX: Always show the format, even if not in our config
+                const qualityInfo = getVideoQualityInfo(format.resolution)
+                if (!format.url) return null
+                
                 const buttonId = `video_${format.format_id}`
                 const isDownloading = downloadingId === buttonId
-                const currentStatus = buttonStatus[buttonId]
-                const progressValue = progress[buttonId] || 0
+                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
                 
-                const showCachedBadge = isCached && !currentStatus
+                // Get the display label
+                let displayLabel = qualityInfo?.label || format.resolution
+                let displayQuality = qualityInfo?.quality || ''
+                let displayPixelSize = qualityInfo?.pixelSize || ''
                 
                 return (
-                  <div key={format.format_id} className={`bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow ${
-                    showCachedBadge ? 'border-2 border-green-400 dark:border-green-600' : ''
-                  }`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          {format.resolution}
-                          {showCachedBadge && (
-                            <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              ⚡ Cached
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{format.quality}</div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          {format.ext.toUpperCase()} • {fileSize}
-                        </div>
+                  <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="mb-2">
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        {displayLabel}
+                        {format.quality && format.quality !== 'Standard' && (
+                          <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
+                            {format.quality}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <FaClock />
-                        <span>{isCached ? 'Instant' : fileSize.includes('GB') ? '~2-5 min' : fileSize.includes('MB') ? '~5-30 sec' : '~2-5 sec'}</span>
+                      {displayQuality && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {displayQuality} {displayPixelSize && `• ${displayPixelSize}`}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {format.ext.toUpperCase()} • {fileSize}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDownload(mediaInfo.webpage_url, qualityNumber.toString(), 'video', buttonId)}
-                      disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'video')} disabled:opacity-90 min-h-[44px] relative overflow-hidden`}
-                    >
-                      {/* White Light Loading Effect - Fills during Checking cache AND Downloading */}
-                      {isDownloading && (
-                        <>
-                          <div 
-                            className="absolute inset-0 bg-white/35 dark:bg-white/25 transition-all duration-300 rounded-lg"
-                            style={{ 
-                              width: `${Math.min(progressValue, 99)}%`,
-                            }}
-                          />
-                          <div 
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) ${Math.min(progressValue, 99)}%, transparent 100%)`,
-                            }}
-                          />
-                        </>
+                      onClick={() => handleDownload(
+                        mediaInfo.webpage_url,
+                        format.format_id, // Send the actual format ID!
+                        format.resolution,
+                        'video',
+                        buttonId
                       )}
-                      {/* Content Layer */}
-                      {renderButtonContent(buttonId, isCached, isCached ? 'Download (Cached)' : 'Download')}
+                      disabled={isDownloading}
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white relative overflow-hidden ${
+                        isDownloading 
+                          ? 'bg-blue-400 cursor-wait' 
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {isDownloading && (
+                        <div 
+                          className="absolute inset-0 bg-white/40 dark:bg-white/30 transition-all duration-300"
+                          style={{ 
+                            width: '100%',
+                            animation: 'pulse-light 0.8s ease-in-out infinite'
+                          }}
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center justify-center gap-2">
+                        {isDownloading ? (
+                          <>
+                            <FaSpinner className="animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <FaDownload />
+                            Download
+                          </>
+                        )}
+                      </span>
                     </button>
                   </div>
                 )
@@ -404,63 +288,74 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
             </div>
           )}
 
+          {activeTab === 'video' && mediaInfo.video_formats.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>No video formats available for this URL.</p>
+            </div>
+          )}
+
+          {/* ============================================
+              AUDIO SECTION
+              ============================================ */}
           {activeTab === 'audio' && mediaInfo.audio_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {mediaInfo.audio_formats.map((format: AudioFormat) => {
-                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
-                const isCached = cacheInfo?.isAudioCached || false
+                const qualityInfo = getAudioQualityInfo(format.bitrate)
+                if (!format.url && !format.format_id.includes('audio_')) return null
+                
                 const buttonId = `audio_${format.format_id}`
                 const isDownloading = downloadingId === buttonId
-                const currentStatus = buttonStatus[buttonId]
-                const progressValue = progress[buttonId] || 0
-                const showCachedBadge = isCached && !currentStatus
+                const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
+                
+                const bitrateMatch = format.bitrate.match(/(\d+)/)
+                const bitrateValue = bitrateMatch ? bitrateMatch[0] : '128'
                 
                 return (
-                  <div key={format.format_id} className={`bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow ${
-                    showCachedBadge ? 'border-2 border-green-400 dark:border-green-600' : ''
-                  }`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          {format.bitrate}
-                          {showCachedBadge && (
-                            <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
-                              ⚡ Cached
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          {format.ext.toUpperCase()} • {fileSize}
-                        </div>
+                  <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="mb-2">
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        {qualityInfo ? qualityInfo.label : format.bitrate}
                       </div>
-                      <div className="text-xs text-gray-400">
-                        {isCached ? 'Instant' : fileSize.includes('MB') ? '5-15 sec' : '2-5 sec'}
+                      {qualityInfo && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {qualityInfo.quality}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {format.ext.toUpperCase()} • {fileSize}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDownload(mediaInfo.webpage_url, 'audio', 'audio', buttonId)}
+                      onClick={() => handleDownload(mediaInfo.webpage_url, bitrateValue, bitrateValue, 'audio', buttonId)}
                       disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${getButtonColor(buttonId, isCached, 'audio')} disabled:opacity-90 min-h-[44px] relative overflow-hidden`}
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white relative overflow-hidden ${
+                        isDownloading 
+                          ? 'bg-purple-400 cursor-wait' 
+                          : 'bg-purple-600 hover:bg-purple-700'
+                      }`}
                     >
-                      {/* White Light Loading Effect - Fills during Checking cache AND Downloading */}
                       {isDownloading && (
-                        <>
-                          <div 
-                            className="absolute inset-0 bg-white/35 dark:bg-white/25 transition-all duration-300 rounded-lg"
-                            style={{ 
-                              width: `${Math.min(progressValue, 99)}%`,
-                            }}
-                          />
-                          <div 
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) ${Math.min(progressValue, 99)}%, transparent 100%)`,
-                            }}
-                          />
-                        </>
+                        <div 
+                          className="absolute inset-0 bg-white/40 dark:bg-white/30 transition-all duration-300"
+                          style={{ 
+                            width: '100%',
+                            animation: 'pulse-light 0.8s ease-in-out infinite'
+                          }}
+                        />
                       )}
-                      {/* Content Layer */}
-                      {renderButtonContent(buttonId, isCached, isCached ? 'Download MP3 (Cached)' : 'Download MP3')}
+                      <span className="relative z-10 flex items-center justify-center gap-2">
+                        {isDownloading ? (
+                          <>
+                            <FaSpinner className="animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <FaDownload />
+                            Download MP3
+                          </>
+                        )}
+                      </span>
                     </button>
                   </div>
                 )
@@ -468,7 +363,16 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
             </div>
           )}
 
-          {activeTab === 'thumbnail' && (
+          {activeTab === 'audio' && mediaInfo.audio_formats.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>No audio formats available for this URL.</p>
+            </div>
+          )}
+
+          {/* ============================================
+              THUMBNAIL SECTION
+              ============================================ */}
+          {activeTab === 'thumbnail' && mediaInfo.thumbnail && (
             <div className="text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
@@ -497,6 +401,14 @@ export default function ResultSection({ mediaInfo, cacheInfo }: ResultSectionPro
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-light {
+          0% { opacity: 0.3; }
+          50% { opacity: 0.7; }
+          100% { opacity: 0.3; }
+        }
+      `}</style>
     </section>
   )
 }
