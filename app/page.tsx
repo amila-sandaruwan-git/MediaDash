@@ -118,20 +118,14 @@ export default function Home() {
       <Navbar />
       
       <div className="pt-16">
-        <HeroSection onConvert={handleConvert} isLoading={isLoading} />
-        
-        {error && (
-          <div className="max-w-3xl mx-auto px-4 -mt-8">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-red-700 dark:text-red-400">{error.message}</p>
-              {error.suggestion && (
-                <p className="text-sm text-red-600 dark:text-red-300 mt-2">
-                  💡 {error.suggestion}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        {/* ============================================
+            PASS ERROR TO HERO SECTION
+            ============================================ */}
+        <HeroSection 
+          onConvert={handleConvert} 
+          isLoading={isLoading}
+          error={error}  // 👈 PASS ERROR HERE
+        />
         
         {mediaInfo && <ResultSection mediaInfo={mediaInfo} />}
         

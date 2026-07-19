@@ -1,23 +1,67 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaSpinner } from 'react-icons/fa'
+import { FaSpinner, FaTimes } from 'react-icons/fa'
 import Image from 'next/image'
 
 interface HeroSectionProps {
   onConvert: (url: string) => void
   isLoading: boolean
+  error?: { message: string; suggestion?: string } | null
 }
 
-export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) {
+export default function HeroSection({ onConvert, isLoading, error }: HeroSectionProps) {
   const [url, setUrl] = useState('')
   const [isPasted, setIsPasted] = useState(false)
+  const [displayError, setDisplayError] = useState<{ message: string; suggestion?: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastConvertedUrlRef = useRef<string>('')
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Track if conversion is pending
   const isConvertingRef = useRef(false)
+
+  // ============================================
+  // HANDLE ERROR WITH AUTO-CLOSE
+  // ============================================
+  useEffect(() => {
+    // Clear any existing timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = null
+    }
+
+    if (error) {
+      setDisplayError(error)
+      
+      // Auto-close after 5 seconds
+      errorTimeoutRef.current = setTimeout(() => {
+        setDisplayError(null)
+        errorTimeoutRef.current = null
+      }, 5000)
+    } else {
+      setDisplayError(null)
+    }
+
+    return () => {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current)
+        errorTimeoutRef.current = null
+      }
+    }
+  }, [error])
+
+  // ============================================
+  // MANUAL CLOSE ERROR
+  // ============================================
+  const closeError = useCallback(() => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = null
+    }
+    setDisplayError(null)
+  }, [])
 
   // ============================================
   // CLEAN UP ON UNMOUNT
@@ -26,6 +70,9 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current)
+      }
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current)
       }
     }
   }, [])
@@ -156,7 +203,7 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 pt-16 overflow-hidden">
       {/* ============================================
-          BACKGROUND IMAGE
+          BACKGROUND IMAGE - z-0
           ============================================ */}
       <div className="absolute inset-0 z-0">
         <div className="relative w-full h-full">
@@ -165,26 +212,57 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
             alt="Background"
             fill
             priority
-            className="object-cover scale-105 blur-[1px] opacity-80 dark:opacity-65"
+            className="object-cover scale-105 blur-[2px] opacity-80 dark:opacity-65"
             sizes="100vw"
             quality={80}
           />
-          {/* Lighter overlay for better visibility */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/20 to-white/20 dark:from-gray-900/70 dark:via-gray-900/50 dark:to-gray-900/80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/40 to-white/70 dark:from-gray-900/70 dark:via-gray-900/50 dark:to-gray-900/80" />
           <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
         </div>
       </div>
 
       {/* ============================================
-          CONTENT - IMPROVED HEADING VISIBILITY
+          CONTENT - z-10 (ABOVE IMAGE)
           ============================================ */}
       <div className="relative z-10 w-full max-w-3xl mx-auto text-center">
         {/* ============================================
-            MAIN HEADING - FIXED VISIBILITY
+            ERROR MESSAGE - AUTO-CLOSE AFTER 5 SECONDS
             ============================================ */}
+        {displayError && (
+          <div className="relative z-50 mb-4 p-4 bg-red-50/95 dark:bg-red-900/40 backdrop-blur-sm border border-red-200 dark:border-red-800 rounded-2xl shadow-2xl animate-fadeIn">
+            <button
+              onClick={closeError}
+              className="absolute top-2 right-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+              aria-label="Close error"
+            >
+              <FaTimes className="w-4 h-4" />
+            </button>
+            <p className="text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-2 pr-6">
+              <span className="text-xl">⚠️</span>
+              {displayError.message}
+              {displayError.suggestion && (
+                <span className="text-sm text-red-600 dark:text-red-400 ml-2">
+                  💡 {displayError.suggestion}
+                </span>
+              )}
+            </p>
+            {/* Progress bar for auto-close timer */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-200 dark:bg-red-800/50 rounded-b-2xl overflow-hidden">
+              <div 
+                className="h-full bg-red-500 dark:bg-red-400 rounded-b-2xl animate-shrink-width"
+                style={{ 
+                  animationDuration: '5s',
+                  animationFillMode: 'forwards'
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Heading */}
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
           <span className="
-            bg-gradient-to-r from-gray-800 via-gray-800 to-purple-700 
+            bg-gradient-to-r from-blue-700 via-indigo-600 to-purple-700 
             dark:from-blue-300 dark:via-indigo-300 dark:to-purple-300 
             bg-clip-text text-transparent 
             drop-shadow-2xl
@@ -201,10 +279,10 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
           [text-shadow:_0_2px_12px_rgba(255,255,255,0.9)]
           dark:[text-shadow:_0_2px_12px_rgba(0,0,0,0.6)]">
           Paste any URL from{' '}
-          <span className="text-red-700 dark:text-red-700 font-bold drop-shadow-lg">YouTube</span>,{' '}
-          <span className="text-blue-700 dark:text-blue-700 font-bold drop-shadow-lg">Facebook</span>,{' '}
+          <span className="text-blue-700 dark:text-blue-300 font-bold drop-shadow-lg">YouTube</span>,{' '}
+          <span className="text-pink-700 dark:text-pink-300 font-bold drop-shadow-lg">Facebook</span>,{' '}
           <span className="text-purple-700 dark:text-purple-300 font-bold drop-shadow-lg">Instagram</span>,{' '}
-          <span className="text-gray-900 dark:text-gray-700 font-bold drop-shadow-lg">TikTok</span>{' '}
+          <span className="text-gray-900 dark:text-white font-bold drop-shadow-lg">TikTok</span>{' '}
           and{' '}
           <span className="text-orange-700 dark:text-orange-300 font-bold drop-shadow-lg">1000+</span> more
         </p>
@@ -271,6 +349,39 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
           <div className="w-1.5 h-3 bg-gray-500/60 dark:bg-gray-400/60 rounded-full mt-2 animate-pulse"></div>
         </div>
       </div>
+
+      {/* ============================================
+          CSS ANIMATIONS
+          ============================================ */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes shrink-width {
+          from {
+            width: 100%;
+          }
+          to {
+            width: 0%;
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .animate-shrink-width {
+          animation: shrink-width 5s linear forwards;
+        }
+      `}</style>
     </section>
   )
 }
