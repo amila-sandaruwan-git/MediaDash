@@ -1,5 +1,3 @@
-// app/components/Navbar.tsx
-
 'use client'
 
 import Link from 'next/link'
@@ -67,20 +65,42 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Center - Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
+          {/* ============================================
+              CENTER - NAVIGATION LINKS - REDESIGNED
+              ============================================ */}
+          <div className="hidden md:flex items-center space-x-1">
+            {/* About Button */}
             <button 
               onClick={() => scrollToSection('about')}
-              className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors hover:scale-105 transform duration-200"
+              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
+                text-gray-700 dark:text-gray-300 
+                hover:text-blue-600 dark:hover:text-blue-400
+                transition-all duration-300
+                hover:bg-blue-50 dark:hover:bg-blue-900/20
+                hover:shadow-md dark:hover:shadow-blue-500/10
+                group
+              "
             >
-              About
+              <span className="relative z-10">About</span>
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
+
+            {/* Help Button */}
             <button 
               onClick={() => scrollToSection('help')}
-              className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors hover:scale-105 transform duration-200"
+              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
+                text-gray-700 dark:text-gray-300 
+                hover:text-blue-600 dark:hover:text-blue-400
+                transition-all duration-300
+                hover:bg-blue-50 dark:hover:bg-blue-900/20
+                hover:shadow-md dark:hover:shadow-blue-500/10
+                group
+              "
             >
-              Help
+              <span className="relative z-10">Help</span>
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
+
             
           </div>
 

@@ -11,6 +11,25 @@ import { randomUUID } from 'crypto'
 const execPromise = promisify(exec)
 
 // ============================================
+// COOKIES CHECK
+// ============================================
+const cookiesPath = path.join(process.cwd(), 'cookies.txt')
+let cookiesExist = false
+
+async function checkCookies(): Promise<boolean> {
+  try {
+    await fs.access(cookiesPath)
+    cookiesExist = true
+    console.log('✅ Cookies file found! Using cookies for authentication.')
+    return true
+  } catch {
+    cookiesExist = false
+    console.log('⚠️ No cookies.txt found. Some sites may not work.')
+    return false
+  }
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -68,6 +87,7 @@ function getPlatformName(url: string): string {
   if (url.includes('instagram.com') || url.includes('instagr.am')) return 'Instagram'
   if (url.includes('tiktok.com') || url.includes('vm.tiktok.com')) return 'TikTok'
   if (url.includes('twitter.com') || url.includes('x.com')) return 'Twitter/X'
+  if (url.includes('ok.ru') || url.includes('vk.com')) return 'OK.ru/VK'
   if (url.includes('linkedin.com')) return 'LinkedIn'
   if (url.includes('pinterest.com')) return 'Pinterest'
   if (url.includes('snapchat.com')) return 'Snapchat'
@@ -78,11 +98,31 @@ function getPlatformName(url: string): string {
 }
 
 // ============================================
+// BUILD COMMAND WITH COOKIES
+// ============================================
+function buildYtDlpCommand(baseCommand: string, useCookies: boolean = true): string {
+  let cmd = baseCommand
+  
+  // Add cookies if available
+  if (useCookies && cookiesExist) {
+    cmd += ` --cookies "${cookiesPath}"`
+  }
+  
+  // Add user-agent for better compatibility
+  cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`
+  
+  return cmd
+}
+
+// ============================================
 // MAIN POST HANDLER
 // ============================================
 
 export async function POST(request: NextRequest) {
   try {
+    // Check cookies on first request
+    await checkCookies()
+    
     const { url, action, formatId, quality, type } = await request.json()
 
     // Check if yt-dlp is installed
@@ -152,7 +192,8 @@ export async function POST(request: NextRequest) {
 
       if (!isAudio) {
         // VIDEO DOWNLOAD - Use exact format ID
-        downloadCommand = `yt-dlp -f "${formatId}+bestaudio[ext=m4a]/bestaudio/best" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+        let baseCommand = `yt-dlp -f "${formatId}+bestaudio[ext=m4a]/bestaudio/best" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+        downloadCommand = buildYtDlpCommand(baseCommand)
         fileExtension = 'mp4'
         mimeType = 'video/mp4'
         console.log(`[API] Downloading video format ID: ${formatId}`)
@@ -162,7 +203,9 @@ export async function POST(request: NextRequest) {
         mimeType = 'audio/mpeg'
         const bitrateMatch = quality.match(/(\d+)/)
         const bitrate = bitrateMatch ? bitrateMatch[0] : '192'
-        downloadCommand = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --extract-audio --audio-format mp3 --audio-quality ${bitrate}K -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+        
+        let baseCommand = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --extract-audio --audio-format mp3 --audio-quality ${bitrate}K -o "${outputPath}.%(ext)s" "${downloadUrl}"`
+        downloadCommand = buildYtDlpCommand(baseCommand)
         console.log(`[API] Audio bitrate selected: ${bitrate}kbps`)
       }
 
@@ -214,12 +257,50 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('Fetching info for URL:', url)
       
-      const command = `yt-dlp --dump-json --no-playlist --skip-download --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`
+      // Build the info command with cookies
+      let baseCommand = `yt-dlp --dump-json --no-playlist --skip-download --no-warnings "${url}"`
+      const infoCommand = buildYtDlpCommand(baseCommand)
       
-      const { stdout, stderr } = await execPromise(command)
+      console.log('Executing info command:', infoCommand)
+      
+      const { stdout, stderr } = await execPromise(infoCommand)
 
-      if (stderr && !stderr.includes('WARNING') && !stderr.includes('Failed to download')) {
+      // Check for platform-specific errors
+      if (stderr) {
         console.error('yt-dlp stderr:', stderr)
+        
+        // OK.ru specific errors
+        if (stderr.includes('algorithms determined that the video may contain adult content')) {
+          return NextResponse.json({
+            success: false,
+            message: '❌ This video is restricted by OK.ru and cannot be downloaded.',
+            suggestion: 'OK.ru has marked this video as restricted. Try a different video.',
+            platform: 'OK.ru'
+          }, { status: 403 })
+        }
+        
+        if (stderr.includes('Login required') || stderr.includes('Please log in')) {
+          return NextResponse.json({
+            success: false,
+            message: '🔒 This video requires login.',
+            suggestion: 'Please log into OK.ru and export cookies to access this content.',
+            platform: 'OK.ru'
+          }, { status: 401 })
+        }
+        
+        if (stderr.includes('Video unavailable') || stderr.includes('removed')) {
+          return NextResponse.json({
+            success: false,
+            message: '❌ Video is unavailable or has been removed.',
+            suggestion: 'The video may have been deleted or made private.',
+            platform: platform
+          }, { status: 404 })
+        }
+        
+        if (!stderr.includes('WARNING') && !stderr.includes('Failed to download')) {
+          // Only log if not warnings
+          console.error('yt-dlp stderr:', stderr)
+        }
       }
 
       const data = JSON.parse(stdout)
@@ -424,8 +505,11 @@ export async function POST(request: NextRequest) {
       errorMessage = '⚠️ This video is age-restricted.'
       suggestion = 'Try a different video that is not age-restricted.'
     } else if (error.message?.includes('Login required')) {
-      errorMessage = '⚠️ This video requires login.'
-      suggestion = 'Try a public video that does not require login.'
+      errorMessage = '🔒 This video requires login.'
+      suggestion = 'Export cookies from your browser to access this content.'
+    } else if (error.message?.includes('algorithms determined')) {
+      errorMessage = '⚠️ This video is restricted by the platform.'
+      suggestion = 'Export cookies from your browser to access this content.'
     }
 
     return NextResponse.json(

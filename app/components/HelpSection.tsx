@@ -1,6 +1,6 @@
 'use client'
 
-import { FaVideo, FaMusic, FaImage, FaLink, FaDownload, FaReddit } from 'react-icons/fa'
+import { FaVideo, FaMusic, FaImage, FaLink, FaDownload, FaReddit, FaCookie } from 'react-icons/fa'
 
 const steps = [
   {
@@ -90,13 +90,39 @@ export default function HelpSection() {
         </div>
       </div>
 
-      <div className="mt-12 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+      {/* 🔒 NEW: Cookie Support Section */}
+      <div className="mt-6 grid grid-cols-1 gap-6">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FaCookie className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <h3 className="font-semibold text-gray-900 dark:text-white">🍪 Access Restricted Videos</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            Some platforms (like <strong>OK.ru</strong>, <strong>VK</strong>) require login to download videos. Enable this by:
+          </p>
+          <ol className="text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1 ml-2">
+            <li>Install the <strong>"Get cookies.txt"</strong> browser extension</li>
+            <li>Log in to the website (e.g., OK.ru)</li>
+            <li>Click the extension and export cookies</li>
+            <li>Save the file as <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">cookies.txt</code> in the MediaDash folder</li>
+          </ol>
+          <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono text-gray-600 dark:text-gray-400 break-all">
+            📁 C:\Users\YourUser\WEB\mediadash\cookies.txt
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            ⚠️ Some videos are permanently restricted and cannot be downloaded even with cookies.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 dark:text-white mb-2">⚠️ Important: Use Page URLs</h3>
         <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 space-y-1">
           <li>For <strong>Reddit</strong>: Use the post page URL, not the direct video link</li>
           <li>For <strong>YouTube</strong>: Use the watch page URL or share link</li>
           <li>For <strong>Instagram</strong>: Use the post or reel URL</li>
           <li>For <strong>TikTok</strong>: Use the video page URL or share link</li>
+          <li>For <strong>OK.ru/VK</strong>: Use the video page URL and export cookies for restricted content</li>
           <li>Direct video links often <strong>expire</strong> or require special handling</li>
         </ul>
       </div>

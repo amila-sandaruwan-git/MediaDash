@@ -65,3 +65,8 @@ next-env.d.ts
 *.mkv
 *.log
 *.cache
+
+
+# Cookies - don't commit to GitHub!
+cookies.txt
+*.cookies.txt
