@@ -60,3 +60,11 @@
 ```bash
 git clone https://github.com/yourusername/mediadash.git
 cd mediadash
+
+# Windows (using winget)
+winget install yt-dlp.yt-dlp
+
+# Windows (using winget)
+winget install ffmpeg
+
+npm run dev

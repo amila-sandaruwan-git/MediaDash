@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+<<<<<<< HEAD
 import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin } from 'react-icons/fa'
+=======
+import { FaSpinner, FaTimes } from 'react-icons/fa'
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
 import Image from 'next/image'
 
 interface HeroSectionProps {
@@ -14,7 +18,10 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
   const [url, setUrl] = useState('')
   const [isPasted, setIsPasted] = useState(false)
   const [displayError, setDisplayError] = useState<{ message: string; suggestion?: string } | null>(null)
+<<<<<<< HEAD
   const [isFocused, setIsFocused] = useState(false)
+=======
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastConvertedUrlRef = useRef<string>('')
@@ -26,6 +33,10 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
   // HANDLE ERROR WITH AUTO-CLOSE
   // ============================================
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    // Clear any existing timeout
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
     if (errorTimeoutRef.current) {
       clearTimeout(errorTimeoutRef.current)
       errorTimeoutRef.current = null
@@ -33,6 +44,11 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
 
     if (error) {
       setDisplayError(error)
+<<<<<<< HEAD
+=======
+      
+      // Auto-close after 5 seconds
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
       errorTimeoutRef.current = setTimeout(() => {
         setDisplayError(null)
         errorTimeoutRef.current = null
@@ -200,7 +216,11 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 pt-16 overflow-hidden">
       {/* ============================================
+<<<<<<< HEAD
           BACKGROUND - PREMIUM
+=======
+          BACKGROUND IMAGE - z-0
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
           ============================================ */}
       <div className="absolute inset-0 z-0">
         <div className="relative w-full h-full">
@@ -209,21 +229,35 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
             alt="Background"
             fill
             priority
+<<<<<<< HEAD
             className="object-cover scale-110 blur-[2px] opacity-100 dark:opacity-90"
+=======
+            className="object-cover scale-105 blur-[2px] opacity-80 dark:opacity-65"
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
             sizes="100vw"
             quality={100}
           />
+<<<<<<< HEAD
           <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-white/50 dark:from-gray-900/50 dark:via-gray-900/30 dark:to-gray-900/60" />
           <div className="absolute inset-0 bg-gradient-to-t from-blue-500/5 via-purple-500/5 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+=======
+          <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/40 to-white/70 dark:from-gray-900/70 dark:via-gray-900/50 dark:to-gray-900/80" />
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
         </div>
       </div>
 
       {/* ============================================
+<<<<<<< HEAD
           CONTENT
+=======
+          CONTENT - z-10 (ABOVE IMAGE)
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
           ============================================ */}
       <div className="relative z-10 w-full max-w-5xl mx-auto">
         {/* ============================================
+<<<<<<< HEAD
             ERROR MESSAGE
             ============================================ */}
         {displayError && (
@@ -231,6 +265,111 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
             <button
               onClick={closeError}
               className="absolute top-3 right-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+=======
+            ERROR MESSAGE - AUTO-CLOSE AFTER 5 SECONDS
+            ============================================ */}
+        {displayError && (
+          <div className="relative z-50 mb-4 p-4 bg-red-50/95 dark:bg-red-900/40 backdrop-blur-sm border border-red-200 dark:border-red-800 rounded-2xl shadow-2xl animate-fadeIn">
+            <button
+              onClick={closeError}
+              className="absolute top-2 right-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+              aria-label="Close error"
+            >
+              <FaTimes className="w-4 h-4" />
+            </button>
+            <p className="text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-2 pr-6">
+              <span className="text-xl">⚠️</span>
+              {displayError.message}
+              {displayError.suggestion && (
+                <span className="text-sm text-red-600 dark:text-red-400 ml-2">
+                  💡 {displayError.suggestion}
+                </span>
+              )}
+            </p>
+            {/* Progress bar for auto-close timer */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-200 dark:bg-red-800/50 rounded-b-2xl overflow-hidden">
+              <div 
+                className="h-full bg-red-500 dark:bg-red-400 rounded-b-2xl animate-shrink-width"
+                style={{ 
+                  animationDuration: '5s',
+                  animationFillMode: 'forwards'
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Heading */}
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
+          <span className="
+            bg-gradient-to-r from-blue-700 via-indigo-600 to-purple-700 
+            dark:from-blue-300 dark:via-indigo-300 dark:to-purple-300 
+            bg-clip-text text-transparent 
+            drop-shadow-2xl
+            [text-shadow:_0_4px_20px_rgba(255,255,255,0.9),_0_0_40px_rgba(255,255,255,0.3)]
+            dark:[text-shadow:_0_4px_20px_rgba(0,0,0,0.7)]
+          ">
+            Download Videos, Audio &amp; Thumbnails
+          </span>
+        </h1>
+        
+        {/* Subtitle */}
+        <p className="text-lg md:text-xl mb-8 font-semibold drop-shadow-2xl px-2
+          text-gray-800 dark:text-gray-100
+          [text-shadow:_0_2px_12px_rgba(255,255,255,0.9)]
+          dark:[text-shadow:_0_2px_12px_rgba(0,0,0,0.6)]">
+          Paste any URL from{' '}
+          <span className="text-blue-700 dark:text-blue-300 font-bold drop-shadow-lg">YouTube</span>,{' '}
+          <span className="text-pink-700 dark:text-pink-300 font-bold drop-shadow-lg">Facebook</span>,{' '}
+          <span className="text-purple-700 dark:text-purple-300 font-bold drop-shadow-lg">Instagram</span>,{' '}
+          <span className="text-gray-900 dark:text-white font-bold drop-shadow-lg">TikTok</span>{' '}
+          and{' '}
+          <span className="text-orange-700 dark:text-orange-300 font-bold drop-shadow-lg">1000+</span> more
+        </p>
+        
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Paste video or audio URL here..."
+              value={url}
+              onChange={handleChange}
+              onPaste={handlePaste}
+              className="w-full px-6 py-4 rounded-2xl bg-white/95 dark:bg-gray-800/90 backdrop-blur-sm border-2 border-white/50 dark:border-gray-700/50 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-4 focus:ring-blue-500/40 dark:focus:ring-blue-400/40 outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-lg shadow-2xl hover:shadow-3xl"
+            />
+            {isLoading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <FaSpinner className="animate-spin text-blue-600 dark:text-blue-400 w-5 h-5" />
+              </div>
+            )}
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading || !url.trim()}
+            className="px-10 py-4 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 hover:from-blue-500 hover:via-indigo-400 hover:to-purple-500 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg shadow-2xl hover:shadow-3xl hover:scale-105 transform min-w-[160px]"
+          >
+            {isLoading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                Converting...
+              </>
+            ) : (
+              '🚀 CONVERTER'
+            )}
+          </button>
+        </form>
+
+        {/* Platform tags */}
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          {['YouTube', 'Facebook', 'Instagram', 'TikTok', 'X', 'Reddit', 'LinkedIn'].map((site) => (
+            <span 
+              key={site} 
+              className="px-4 py-1.5 bg-white/85 dark:bg-gray-800/80 backdrop-blur-sm border border-white/50 dark:border-gray-700/50 rounded-full text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105"
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
             >
               <FaTimes className="w-4 h-4" />
             </button>
@@ -441,11 +580,19 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
         @keyframes fadeIn {
           from {
             opacity: 0;
+<<<<<<< HEAD
             transform: translateY(-15px) scale(0.98);
           }
           to {
             opacity: 1;
             transform: translateY(0) scale(1);
+=======
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
           }
         }
 
@@ -459,7 +606,11 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
         }
 
         .animate-fadeIn {
+<<<<<<< HEAD
           animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+=======
+          animation: fadeIn 0.3s ease-out forwards;
+>>>>>>> 808d9f662b4d984e08923e6b29b1d90dbc84b397
         }
 
         .animate-shrink-width {
