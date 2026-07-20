@@ -1,23 +1,64 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaSpinner } from 'react-icons/fa'
+import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin } from 'react-icons/fa'
 import Image from 'next/image'
 
 interface HeroSectionProps {
   onConvert: (url: string) => void
   isLoading: boolean
+  error?: { message: string; suggestion?: string } | null
 }
 
-export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) {
+export default function HeroSection({ onConvert, isLoading, error }: HeroSectionProps) {
   const [url, setUrl] = useState('')
   const [isPasted, setIsPasted] = useState(false)
+  const [displayError, setDisplayError] = useState<{ message: string; suggestion?: string } | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastConvertedUrlRef = useRef<string>('')
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Track if conversion is pending
   const isConvertingRef = useRef(false)
+
+  // ============================================
+  // HANDLE ERROR WITH AUTO-CLOSE
+  // ============================================
+  useEffect(() => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = null
+    }
+
+    if (error) {
+      setDisplayError(error)
+      errorTimeoutRef.current = setTimeout(() => {
+        setDisplayError(null)
+        errorTimeoutRef.current = null
+      }, 5000)
+    } else {
+      setDisplayError(null)
+    }
+
+    return () => {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current)
+        errorTimeoutRef.current = null
+      }
+    }
+  }, [error])
+
+  // ============================================
+  // MANUAL CLOSE ERROR
+  // ============================================
+  const closeError = useCallback(() => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current)
+      errorTimeoutRef.current = null
+    }
+    setDisplayError(null)
+  }, [])
 
   // ============================================
   // CLEAN UP ON UNMOUNT
@@ -27,14 +68,16 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current)
       }
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current)
+      }
     }
   }, [])
 
   // ============================================
-  // MAIN AUTO-CONVERT LOGIC - CLEAN & FAST
+  // MAIN AUTO-CONVERT LOGIC
   // ============================================
   useEffect(() => {
-    // Clear previous debounce timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = null
@@ -42,7 +85,6 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
 
     const trimmed = url.trim()
 
-    // Skip if:
     if (!trimmed || trimmed.length < 5 || isLoading || isConvertingRef.current) {
       return
     }
@@ -51,7 +93,6 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
       return
     }
 
-    // Quick URL validation
     let isValidUrl = false
     try {
       new URL(trimmed)
@@ -70,20 +111,17 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
       return
     }
 
-    // If pasted, convert instantly (no debounce)
     if (isPasted) {
       isConvertingRef.current = true
       lastConvertedUrlRef.current = trimmed
       onConvert(trimmed)
       setIsPasted(false)
-      // Reset after a short delay
       setTimeout(() => {
         isConvertingRef.current = false
       }, 100)
       return
     }
 
-    // Typing: debounce 300ms
     debounceTimerRef.current = setTimeout(() => {
       isConvertingRef.current = true
       lastConvertedUrlRef.current = trimmed
@@ -101,25 +139,20 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
   }, [url, isLoading, isPasted, onConvert])
 
   // ============================================
-  // HANDLE PASTE - INSTANT CONVERSION
+  // HANDLE PASTE
   // ============================================
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData('text').trim()
     if (!text || text.length < 5) return
 
-    // Prevent default to avoid double paste
     e.preventDefault()
-
-    // Set URL and mark as pasted
     setUrl(text)
     setIsPasted(true)
     lastConvertedUrlRef.current = text
     
-    // Convert instantly - no delay!
     isConvertingRef.current = true
     onConvert(text)
     
-    // Reset after a short delay
     setTimeout(() => {
       isConvertingRef.current = false
     }, 100)
@@ -153,10 +186,21 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
     }
   }, [isPasted])
 
+  // Platform icons mapping
+  const platformIcons: Record<string, any> = {
+    'YouTube': FaYoutube,
+    'Facebook': FaFacebook,
+    'Instagram': FaInstagram,
+    'TikTok': FaTiktok,
+    'X': FaTwitter,
+    'Reddit': FaReddit,
+    'LinkedIn': FaLinkedin,
+  }
+
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 pt-16 overflow-hidden">
       {/* ============================================
-          BACKGROUND IMAGE
+          BACKGROUND - PREMIUM
           ============================================ */}
       <div className="absolute inset-0 z-0">
         <div className="relative w-full h-full">
@@ -165,112 +209,263 @@ export default function HeroSection({ onConvert, isLoading }: HeroSectionProps) 
             alt="Background"
             fill
             priority
-            className="object-cover scale-105 blur-[1px] opacity-80 dark:opacity-65"
+            className="object-cover scale-110 blur-[2px] opacity-100 dark:opacity-90"
             sizes="100vw"
-            quality={80}
+            quality={100}
           />
-          {/* Lighter overlay for better visibility */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/20 to-white/20 dark:from-gray-900/70 dark:via-gray-900/50 dark:to-gray-900/80" />
-          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-white/50 dark:from-gray-900/50 dark:via-gray-900/30 dark:to-gray-900/60" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-500/5 via-purple-500/5 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
         </div>
       </div>
 
       {/* ============================================
-          CONTENT - IMPROVED HEADING VISIBILITY
+          CONTENT
           ============================================ */}
-      <div className="relative z-10 w-full max-w-3xl mx-auto text-center">
+      <div className="relative z-10 w-full max-w-5xl mx-auto">
         {/* ============================================
-            MAIN HEADING - FIXED VISIBILITY
+            ERROR MESSAGE
             ============================================ */}
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-          <span className="
-            bg-gradient-to-r from-gray-800 via-gray-800 to-purple-700 
-            dark:from-blue-300 dark:via-indigo-300 dark:to-purple-300 
-            bg-clip-text text-transparent 
-            drop-shadow-2xl
-            [text-shadow:_0_4px_20px_rgba(255,255,255,0.9),_0_0_40px_rgba(255,255,255,0.3)]
-            dark:[text-shadow:_0_4px_20px_rgba(0,0,0,0.7)]
-          ">
-            Download Videos, Audio &amp; Thumbnails
-          </span>
-        </h1>
-        
-        {/* Subtitle */}
-        <p className="text-lg md:text-xl mb-8 font-semibold drop-shadow-2xl px-2
-          text-gray-800 dark:text-gray-100
-          [text-shadow:_0_2px_12px_rgba(255,255,255,0.9)]
-          dark:[text-shadow:_0_2px_12px_rgba(0,0,0,0.6)]">
-          Paste any URL from{' '}
-          <span className="text-red-700 dark:text-red-700 font-bold drop-shadow-lg">YouTube</span>,{' '}
-          <span className="text-blue-700 dark:text-blue-700 font-bold drop-shadow-lg">Facebook</span>,{' '}
-          <span className="text-purple-700 dark:text-purple-300 font-bold drop-shadow-lg">Instagram</span>,{' '}
-          <span className="text-gray-900 dark:text-gray-700 font-bold drop-shadow-lg">TikTok</span>{' '}
-          and{' '}
-          <span className="text-orange-700 dark:text-orange-300 font-bold drop-shadow-lg">1000+</span> more
-        </p>
-        
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="Paste video or audio URL here..."
-              value={url}
-              onChange={handleChange}
-              onPaste={handlePaste}
-              className="w-full px-6 py-4 rounded-2xl bg-white/95 dark:bg-gray-800/90 backdrop-blur-sm border-2 border-white/50 dark:border-gray-700/50 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-4 focus:ring-blue-500/40 dark:focus:ring-blue-400/40 outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-lg shadow-2xl hover:shadow-3xl"
-            />
-            {isLoading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <FaSpinner className="animate-spin text-blue-600 dark:text-blue-400 w-5 h-5" />
-              </div>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading || !url.trim()}
-            className="px-10 py-4 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 hover:from-blue-500 hover:via-indigo-400 hover:to-purple-500 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg shadow-2xl hover:shadow-3xl hover:scale-105 transform min-w-[160px]"
-          >
-            {isLoading ? (
-              <>
-                <FaSpinner className="animate-spin" />
-                Converting...
-              </>
-            ) : (
-              '🚀 CONVERTER'
-            )}
-          </button>
-        </form>
-
-        {/* Platform tags */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {['YouTube', 'Facebook', 'Instagram', 'TikTok', 'X', 'Reddit', 'LinkedIn'].map((site) => (
-            <span 
-              key={site} 
-              className="px-4 py-1.5 bg-white/85 dark:bg-gray-800/80 backdrop-blur-sm border border-white/50 dark:border-gray-700/50 rounded-full text-sm font-semibold text-gray-800 dark:text-gray-200 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105"
+        {displayError && (
+          <div className="relative z-50 mb-6 p-5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-red-200/50 dark:border-red-800/50 rounded-2xl shadow-2xl animate-fadeIn max-w-3xl mx-auto">
+            <button
+              onClick={closeError}
+              className="absolute top-3 right-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
             >
-              {site}
+              <FaTimes className="w-4 h-4" />
+            </button>
+            <p className="text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-3 pr-8 flex-wrap">
+              <span className="text-2xl">⚠️</span>
+              <span>{displayError.message}</span>
+              {displayError.suggestion && (
+                <span className="text-sm bg-red-100/50 dark:bg-red-800/30 px-3 py-1 rounded-full">
+                  💡 {displayError.suggestion}
+                </span>
+              )}
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-200 dark:bg-red-800/50 rounded-b-2xl overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-red-500 to-red-300 rounded-b-2xl animate-shrink-width"
+                style={{ animationDuration: '5s', animationFillMode: 'forwards' }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="text-center">
+          {/* ============================================
+              BADGE
+              ============================================ */}
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 mb-8 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl border border-white/40 dark:border-gray-700/40 rounded-full shadow-xl">
+            
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wider uppercase">
+              🎯 100% Free • No Sign-up • Unlimited Downloads
             </span>
-          ))}
-        </div>
+          </div>
 
-        {/* Footer hint */}
-        <div className="mt-4 text-sm text-gray-700 dark:text-gray-300 font-medium drop-shadow-2xl
-          [text-shadow:_0_2px_8px_rgba(255,255,255,0.9)]
-          dark:[text-shadow:_0_2px_8px_rgba(0,0,0,0.6)]">
-          💡 Paste a URL to auto-convert instantly
+          {/* ============================================
+              MAIN HEADING - WITH STRONG DARK SHADOW
+              ============================================ */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight">
+            <span className="
+              bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 
+              dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 
+              bg-clip-text text-transparent 
+              drop-shadow-2xl
+              [text-shadow:_0_4px_40px_rgba(0,0,0,0.3),_0_0_80px_rgba(0,0,0,0.15),_0_2px_10px_rgba(0,0,0,0.2)]
+              dark:[text-shadow:_0_4px_40px_rgba(0,0,0,0.5),_0_0_80px_rgba(0,0,0,0.3)]
+            ">
+              Download Videos,<br />
+              Audio &amp; Thumbnails
+            </span>
+          </h1>
+
+          {/* ============================================
+              SUBTITLE - WITH STRONG DARK SHADOW
+              ============================================ */}
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-8 font-medium px-4
+            text-gray-800/95 dark:text-gray-100/95
+            [text-shadow:_0_2px_20px_rgba(0,0,0,0.15),_0_4px_30px_rgba(255,255,255,0.3)]
+            dark:[text-shadow:_0_2px_30px_rgba(0,0,0,0.6)]">
+            Paste any URL from{' '}
+            <span className="inline-flex items-center gap-1 text-red-800 dark:text-red-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
+              YouTube
+            </span>
+            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
+            <span className="inline-flex items-center gap-1 text-blue-800 dark:text-blue-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
+              Facebook
+            </span>
+            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
+            <span className="inline-flex items-center gap-1 text-purple-800 dark:text-purple-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
+              Instagram
+            </span>
+            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
+            <span className="inline-flex items-center gap-1 text-black dark:text-white font-bold hover:scale-105 transition-transform duration-200 cursor-default">
+              TikTok
+            </span>
+            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
+            <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
+              1000+
+            </span>
+            <span className="text-gray-600 dark:text-gray-300">more</span>
+          </p>
+
+          {/* ============================================
+              SEARCH FORM
+              ============================================ */}
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-3xl mx-auto">
+            <div className="flex-1 relative group">
+              <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl blur transition-all duration-500 ${
+                isFocused ? 'opacity-60' : 'opacity-20'
+              }`}></div>
+              
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="🔗 Paste video or audio URL here..."
+                  value={url}
+                  onChange={handleChange}
+                  onPaste={handlePaste}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  className="w-full px-6 py-4.5 pr-14 rounded-2xl bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-2 border-white/60 dark:border-gray-700/60 focus:border-blue-500/60 dark:focus:border-blue-400/60 focus:ring-4 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-base md:text-lg shadow-2xl"
+                />
+                
+                {isLoading && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <FaSpinner className="animate-spin text-blue-600 dark:text-blue-400 w-5 h-5" />
+                  </div>
+                )}
+
+                {isPasted && !isLoading && url.trim() && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full animate-pulse">
+                      ✓ Pasted
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || !url.trim()}
+              className="relative px-8 py-4.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 hover:from-blue-500 hover:via-indigo-400 hover:to-purple-500 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base md:text-lg shadow-2xl hover:shadow-3xl hover:scale-105 transform min-w-[180px] group overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+              
+              {isLoading ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  <span>Converting...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">🚀</span>
+                  <span>CONVERTER</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* ============================================
+              PLATFORM TAGS
+              ============================================ */}
+          <div className="mt-8 flex flex-wrap justify-center gap-2.5">
+            {['YouTube', 'Facebook', 'Instagram', 'TikTok', 'X', 'Reddit', 'LinkedIn'].map((site) => {
+              const Icon = platformIcons[site]
+              return (
+                <span 
+                  key={site} 
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border border-white/50 dark:border-gray-700/50 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 hover:bg-white/90 dark:hover:bg-gray-800/90 cursor-default group"
+                >
+                  {Icon && <Icon className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />}
+                  <span>{site}</span>
+                </span>
+              )
+            })}
+          </div>
+
+          {/* ============================================
+              FEATURE HIGHLIGHTS
+              ============================================ */}
+          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
+              <FaDownload className="text-blue-500 w-4 h-4" />
+              <span>Up to 8K</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
+              <FaMusic className="text-purple-500 w-4 h-4" />
+              <span>320kbps Audio</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
+              <FaImage className="text-pink-500 w-4 h-4" />
+              <span>HD Thumbnails</span>
+            </div>
+          </div>
+
+          {/* ============================================
+              FOOTER HINT
+          ============================================ */}
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300
+            [text-shadow:_0_2px_15px_rgba(0,0,0,0.1)]">
+            <span className="text-lg">💡</span>
+            <span>Paste a URL to auto-convert instantly</span>
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          </div>
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-        <div className="w-6 h-10 rounded-full border-2 border-gray-500/60 dark:border-gray-400/60 flex justify-center">
-          <div className="w-1.5 h-3 bg-gray-500/60 dark:bg-gray-400/60 rounded-full mt-2 animate-pulse"></div>
+      {/* ============================================
+          SCROLL INDICATOR
+          ============================================ */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+        <div className="flex flex-col items-center gap-1.5 animate-bounce opacity-70 hover:opacity-100 transition-opacity">
+          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+            Scroll
+          </span>
+          <div className="w-5 h-8 rounded-full border-2 border-gray-400/40 dark:border-gray-500/40 flex justify-center backdrop-blur-sm bg-white/10 dark:bg-gray-800/10">
+            <div className="w-1.5 h-2.5 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mt-1.5 animate-pulse"></div>
+          </div>
         </div>
       </div>
+
+      {/* ============================================
+          CSS ANIMATIONS
+          ============================================ */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-15px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes shrink-width {
+          from {
+            width: 100%;
+          }
+          to {
+            width: 0%;
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .animate-shrink-width {
+          animation: shrink-width 5s linear forwards;
+        }
+      `}</style>
     </section>
   )
 }
