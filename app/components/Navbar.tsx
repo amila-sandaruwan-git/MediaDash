@@ -101,7 +101,26 @@ export default function Navbar() {
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
 
-            
+            {/* ============================================
+                INSTALL BUTTON - NEW
+                ============================================ */}
+            <button 
+              onClick={() => scrollToSection('install')}
+              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
+                text-gray-700 dark:text-gray-300 
+                hover:text-blue-600 dark:hover:text-blue-400
+                transition-all duration-300
+                hover:bg-blue-50 dark:hover:bg-blue-900/20
+                hover:shadow-md dark:hover:shadow-blue-500/10
+                group
+              "
+            >
+              <span className="relative z-10 flex items-center gap-1.5">
+                <FaDownload className="text-xs" />
+                Install
+              </span>
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </button>
           </div>
 
           {/* Right side - Dark Mode Toggle */}

@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Comment this out if you want the API to work in development
-  // output: 'export',
+  
   images: {
     domains: ['i.ytimg.com', 'img.youtube.com'],
     unoptimized: true,
