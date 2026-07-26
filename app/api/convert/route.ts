@@ -103,12 +103,10 @@ function getPlatformName(url: string): string {
 function buildYtDlpCommand(baseCommand: string, useCookies: boolean = true): string {
   let cmd = baseCommand
   
-  // Add cookies if available
   if (useCookies && cookiesExist) {
     cmd += ` --cookies "${cookiesPath}"`
   }
   
-  // Add user-agent for better compatibility
   cmd += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`
   
   return cmd
@@ -120,12 +118,10 @@ function buildYtDlpCommand(baseCommand: string, useCookies: boolean = true): str
 
 export async function POST(request: NextRequest) {
   try {
-    // Check cookies on first request
     await checkCookies()
     
     const { url, action, formatId, quality, type } = await request.json()
 
-    // Check if yt-dlp is installed
     const isInstalled = await checkYtDlpInstalled()
     if (!isInstalled) {
       return NextResponse.json(
@@ -141,7 +137,6 @@ export async function POST(request: NextRequest) {
     const urlType = getUrlType(url)
     const platform = getPlatformName(url)
 
-    // Reddit direct link handling
     if (urlType === 'direct' && (url.includes('redd.it') || url.includes('reddit.com'))) {
       return NextResponse.json({
         success: false,
@@ -191,14 +186,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (!isAudio) {
-        // VIDEO DOWNLOAD - Use exact format ID
         let baseCommand = `yt-dlp -f "${formatId}+bestaudio[ext=m4a]/bestaudio/best" --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${downloadUrl}"`
         downloadCommand = buildYtDlpCommand(baseCommand)
         fileExtension = 'mp4'
         mimeType = 'video/mp4'
         console.log(`[API] Downloading video format ID: ${formatId}`)
       } else {
-        // AUDIO DOWNLOAD
         fileExtension = 'mp3'
         mimeType = 'audio/mpeg'
         const bitrateMatch = quality.match(/(\d+)/)
@@ -238,7 +231,6 @@ export async function POST(request: NextRequest) {
       else if (ext === 'mkv') mimeType = 'video/x-matroska'
       else if (ext === 'mp4') mimeType = 'video/mp4'
 
-      // Clean up temp file
       await fs.unlink(filePath).catch(() => {})
 
       const uint8Array = new Uint8Array(fileBuffer)
@@ -257,7 +249,6 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('Fetching info for URL:', url)
       
-      // Build the info command with cookies
       let baseCommand = `yt-dlp --dump-json --no-playlist --skip-download --no-warnings "${url}"`
       const infoCommand = buildYtDlpCommand(baseCommand)
       
@@ -265,11 +256,9 @@ export async function POST(request: NextRequest) {
       
       const { stdout, stderr } = await execPromise(infoCommand)
 
-      // Check for platform-specific errors
       if (stderr) {
         console.error('yt-dlp stderr:', stderr)
         
-        // OK.ru specific errors
         if (stderr.includes('algorithms determined that the video may contain adult content')) {
           return NextResponse.json({
             success: false,
@@ -298,7 +287,6 @@ export async function POST(request: NextRequest) {
         }
         
         if (!stderr.includes('WARNING') && !stderr.includes('Failed to download')) {
-          // Only log if not warnings
           console.error('yt-dlp stderr:', stderr)
         }
       }
@@ -309,7 +297,7 @@ export async function POST(request: NextRequest) {
       console.log(`[API] Title: ${data.title}`)
 
       // ============================================
-      // VIDEO FORMATS - SHOW ALL AVAILABLE
+      // VIDEO FORMATS
       // ============================================
       const allVideoFormats = data.formats
         .filter((f: any) => {
@@ -350,7 +338,6 @@ export async function POST(request: NextRequest) {
         })
         .filter((f: any) => f.url && f.url.length > 0)
 
-      // Deduplicate by resolution
       const groupedByHeight = new Map()
       for (const format of allVideoFormats) {
         const height = format.height

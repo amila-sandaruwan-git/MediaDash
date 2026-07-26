@@ -91,9 +91,8 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
         qualityValue = `${quality}kbps`
         formatIdValue = 'bestaudio'
       } else {
-        // For video, send the actual format ID (e.g., '137', '248', '399')
         qualityValue = quality
-        formatIdValue = formatId // This is the actual yt-dlp format ID!
+        formatIdValue = formatId
       }
 
       const response = await fetch('/api/convert', {
@@ -211,7 +210,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           {activeTab === 'video' && mediaInfo.video_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {mediaInfo.video_formats.map((format: VideoFormat) => {
-                // 🔥 FIX: Always show the format, even if not in our config
                 const qualityInfo = getVideoQualityInfo(format.resolution)
                 if (!format.url) return null
                 
@@ -219,7 +217,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 const isDownloading = downloadingId === buttonId
                 const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
                 
-                // Get the display label
                 let displayLabel = qualityInfo?.label || format.resolution
                 let displayQuality = qualityInfo?.quality || ''
                 let displayPixelSize = qualityInfo?.pixelSize || ''
@@ -247,7 +244,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                     <button
                       onClick={() => handleDownload(
                         mediaInfo.webpage_url,
-                        format.format_id, // Send the actual format ID!
+                        format.format_id,
                         format.resolution,
                         'video',
                         buttonId
@@ -370,7 +367,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           )}
 
           {/* ============================================
-              THUMBNAIL SECTION
+              THUMBNAIL SECTION - FIXED
               ============================================ */}
           {activeTab === 'thumbnail' && mediaInfo.thumbnail && (
             <div className="text-center">
@@ -381,13 +378,26 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 className="max-w-md mx-auto rounded-lg shadow-lg mb-4"
               />
               <button
-                onClick={() => {
-                  const link = document.createElement('a')
-                  link.href = mediaInfo.thumbnail
-                  link.download = `${mediaInfo.title}_thumbnail.jpg`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
+                onClick={async () => {
+                  try {
+                    // Fetch the image as a blob
+                    const response = await fetch(mediaInfo.thumbnail)
+                    const blob = await response.blob()
+                    
+                    // Create a download link
+                    const link = document.createElement('a')
+                    link.href = URL.createObjectURL(blob)
+                    link.download = `${mediaInfo.title || 'thumbnail'}.jpg`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    
+                    setTimeout(() => URL.revokeObjectURL(link.href), 100)
+                  } catch (error) {
+                    console.error('Thumbnail download failed:', error)
+                    // Fallback: open in new tab if fetch fails
+                    window.open(mediaInfo.thumbnail, '_blank')
+                  }
                 }}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mx-auto"
               >
