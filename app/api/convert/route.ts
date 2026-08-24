@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          message: 'yt-dlp is not installed. Please install it first.So,use desktop app, download it from Install section',
+          message: 'yt-dlp is not installed. Please install it first.',
           details: 'Download from: https://github.com/yt-dlp/yt-dlp/releases/latest'
         },
         { status: 500 }

@@ -1,8 +1,11 @@
+// app/components/HeroSection.tsx
+
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin } from 'react-icons/fa'
+import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin, FaDesktop } from 'react-icons/fa'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface HeroSectionProps {
   onConvert: (url: string) => void
@@ -15,6 +18,7 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
   const [isPasted, setIsPasted] = useState(false)
   const [displayError, setDisplayError] = useState<{ message: string; suggestion?: string } | null>(null)
   const [isFocused, setIsFocused] = useState(false)
+  const [showWebWarning, setShowWebWarning] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastConvertedUrlRef = useRef<string>('')
@@ -58,6 +62,13 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
       errorTimeoutRef.current = null
     }
     setDisplayError(null)
+  }, [])
+
+  // ============================================
+  // CLOSE WEB WARNING
+  // ============================================
+  const closeWebWarning = useCallback(() => {
+    setShowWebWarning(false)
   }, [])
 
   // ============================================
@@ -197,6 +208,13 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
     'LinkedIn': FaLinkedin,
   }
 
+  const scrollToInstall = () => {
+    const installSection = document.getElementById('install')
+    if (installSection) {
+      installSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 pt-16 overflow-hidden">
       {/* ============================================
@@ -223,6 +241,49 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
           CONTENT
           ============================================ */}
       <div className="relative z-10 w-full max-w-5xl mx-auto">
+        {/* ============================================
+            WEB CONVERTER WARNING - SHOWS ON EVERY VISIT
+            ============================================ */}
+        {showWebWarning && (
+          <div className="relative z-50 mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 backdrop-blur-xl border border-amber-200/60 dark:border-amber-800/60 rounded-2xl shadow-2xl animate-fadeIn max-w-3xl mx-auto">
+            <button
+              onClick={closeWebWarning}
+              className="absolute top-3 right-3 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+            >
+              <FaTimes className="w-4 h-4" />
+            </button>
+            <div className="flex items-start gap-4 pr-8">
+              <div className="flex-shrink-0 text-3xl mt-0.5">⚠️</div>
+              <div>
+                <h4 className="text-amber-800 dark:text-amber-300 font-bold text-base">
+                  Web Converter is Disabled
+                </h4>
+                <p className="text-amber-700 dark:text-amber-400 text-sm mt-1">
+                  The web version cannot process downloads because <code className="bg-amber-100 dark:bg-amber-800/30 px-2 py-0.5 rounded text-xs font-mono">yt-dlp</code> is not available on this server.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={scrollToInstall}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg text-sm"
+                  >
+                    <FaDesktop className="w-4 h-4" />
+                    Download Desktop App
+                  </button>
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    Works offline • Full features
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-400 dark:from-amber-600 dark:to-orange-600 rounded-b-2xl overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-2xl animate-shrink-width"
+                style={{ animationDuration: '8s', animationFillMode: 'forwards' }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ============================================
             ERROR MESSAGE
             ============================================ */}
@@ -254,16 +315,17 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
 
         <div className="text-center">
           {/* ============================================
-              BADGE
+              BADGE - UPDATED
               ============================================ */}
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 mb-8 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl border border-white/40 dark:border-gray-700/40 rounded-full shadow-xl">
-            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wider uppercase">
-              🎯 100% Free • No Sign-up • Unlimited Downloads
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 mb-8 bg-amber-50/80 dark:bg-amber-900/30 backdrop-blur-xl border border-amber-200/40 dark:border-amber-700/40 rounded-full shadow-xl">
+            <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 tracking-wider uppercase flex items-center gap-2">
+              <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+              💻 Web Version • Download Desktop App for Full Features
             </span>
           </div>
 
           {/* ============================================
-              MAIN HEADING - WITH STRONG DARK SHADOW
+              MAIN HEADING
               ============================================ */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight">
             <span className="
@@ -280,7 +342,7 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
           </h1>
 
           {/* ============================================
-              SUBTITLE - WITH STRONG DARK SHADOW
+              SUBTITLE - WITH DESKTOP APP CTA
               ============================================ */}
           <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-8 font-medium px-4
             text-gray-800/95 dark:text-gray-100/95
@@ -408,13 +470,21 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
           </div>
 
           {/* ============================================
-              FOOTER HINT
+              FOOTER HINT - UPDATED WITH DESKTOP APP LINK
               ============================================ */}
-          <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300
             [text-shadow:_0_2px_15px_rgba(0,0,0,0.1)]">
             <span className="text-lg">💡</span>
             <span>Paste a URL to auto-convert instantly</span>
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="w-px h-6 bg-gray-300 dark:bg-gray-600"></span>
+            <button
+              onClick={scrollToInstall}
+              className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-semibold transition-colors"
+            >
+              <FaDesktop className="w-3.5 h-3.5" />
+              <span>Download Desktop App</span>
+            </button>
           </div>
         </div>
       </div>
