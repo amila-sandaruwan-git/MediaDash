@@ -1,3 +1,5 @@
+// app/components/Footer.tsx
+
 'use client'
 
 import { FaGithub, FaTwitter, FaYoutube, FaHeart, FaEnvelope, FaDiscord, FaRocket } from 'react-icons/fa'
