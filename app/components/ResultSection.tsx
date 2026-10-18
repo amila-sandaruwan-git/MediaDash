@@ -1,3 +1,5 @@
+// app/components/ResultSection.tsx
+
 'use client'
 
 import { MediaInfo, VideoFormat, AudioFormat } from '../types'
@@ -16,7 +18,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
   if (!mediaInfo) return null
 
   // ============================================
-  // VIDEO RESOLUTION CONFIGURATION - FOR LABELS ONLY
+  // VIDEO RESOLUTION CONFIGURATION
   // ============================================
   const videoQualityConfigs: Record<string, { label: string; pixelSize: string; quality: string }> = {
     '144': { label: '144p', pixelSize: '256x144', quality: 'Low' },
@@ -52,9 +54,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
     return `${size} ${sizes[i]}`
   }
 
-  // ============================================
-  // GET VIDEO QUALITY INFO - RETURNS LABEL OR FALLBACK
-  // ============================================
   const getVideoQualityInfo = (resolution: string) => {
     const match = resolution.match(/(\d+)/)
     if (!match) return null
@@ -66,9 +65,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
     }
   }
 
-  // ============================================
-  // GET AUDIO QUALITY INFO
-  // ============================================
   const getAudioQualityInfo = (bitrate: string) => {
     const match = bitrate.match(/(\d+)/)
     if (!match) return null
@@ -77,7 +73,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
   }
 
   // ============================================
-  // DOWNLOAD HANDLER - SENDS ACTUAL FORMAT ID
+  // DOWNLOAD HANDLER
   // ============================================
   const handleDownload = async (url: string, formatId: string, quality: string, type: 'video' | 'audio', buttonId: string) => {
     try {
@@ -88,14 +84,20 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
       let formatIdValue: string
       
       if (type === 'audio') {
-        qualityValue = `${quality}kbps`
+        // 👇 FIXED: Always send 'audio' so main.js knows it's an MP3
+        qualityValue = 'audio'
         formatIdValue = 'bestaudio'
       } else {
         qualityValue = quality
         formatIdValue = formatId
       }
 
-      const response = await fetch('/api/convert', {
+      // Use the full URL for the desktop app
+      const apiUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001/api/convert' 
+        : '/api/convert'
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,11 +113,12 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.message || 'Download failed')
+        // 👇 This catches the error from yt-dlp and shows it
+        throw new Error(errorData.error || errorData.message || 'Download failed')
       }
 
       const blob = await response.blob()
-      const filename = `${mediaInfo.title || 'video'}_${quality}.${type === 'video' ? 'mp4' : 'mp3'}`
+      const filename = `${mediaInfo.title || 'media'}_${type === 'video' ? quality : 'audio'}.${type === 'video' ? 'mp4' : 'mp3'}`
       
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
@@ -145,7 +148,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
       )}
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
-        {/* Video Info Header */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -165,7 +167,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab('video')}
@@ -202,11 +203,8 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
-          {/* ============================================
-              VIDEO SECTION - SHOW ALL FORMATS
-              ============================================ */}
+          {/* VIDEO SECTION */}
           {activeTab === 'video' && mediaInfo.video_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {mediaInfo.video_formats.map((format: VideoFormat) => {
@@ -217,26 +215,15 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 const isDownloading = downloadingId === buttonId
                 const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
                 
-                let displayLabel = qualityInfo?.label || format.resolution
-                let displayQuality = qualityInfo?.quality || ''
-                let displayPixelSize = qualityInfo?.pixelSize || ''
-                
                 return (
                   <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="mb-2">
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        {displayLabel}
-                        {format.quality && format.quality !== 'Standard' && (
-                          <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
-                            {format.quality}
-                          </span>
-                        )}
+                        {qualityInfo?.label || format.resolution}
                       </div>
-                      {displayQuality && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {displayQuality} {displayPixelSize && `• ${displayPixelSize}`}
-                        </div>
-                      )}
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {qualityInfo?.quality} {qualityInfo?.pixelSize && `• ${qualityInfo.pixelSize}`}
+                      </div>
                       <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                         {format.ext.toUpperCase()} • {fileSize}
                       </div>
@@ -250,34 +237,15 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                         buttonId
                       )}
                       disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white relative overflow-hidden ${
-                        isDownloading 
-                          ? 'bg-blue-400 cursor-wait' 
-                          : 'bg-blue-600 hover:bg-blue-700'
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${
+                        isDownloading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'
                       }`}
                     >
-                      {isDownloading && (
-                        <div 
-                          className="absolute inset-0 bg-white/40 dark:bg-white/30 transition-all duration-300"
-                          style={{ 
-                            width: '100%',
-                            animation: 'pulse-light 0.8s ease-in-out infinite'
-                          }}
-                        />
+                      {isDownloading ? (
+                        <><FaSpinner className="animate-spin" /> Downloading...</>
+                      ) : (
+                        <><FaDownload /> Download</>
                       )}
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        {isDownloading ? (
-                          <>
-                            <FaSpinner className="animate-spin" />
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <FaDownload />
-                            Download
-                          </>
-                        )}
-                      </span>
                     </button>
                   </div>
                 )
@@ -285,15 +253,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
             </div>
           )}
 
-          {activeTab === 'video' && mediaInfo.video_formats.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <p>No video formats available for this URL.</p>
-            </div>
-          )}
-
-          {/* ============================================
-              AUDIO SECTION
-              ============================================ */}
+          {/* AUDIO SECTION */}
           {activeTab === 'audio' && mediaInfo.audio_formats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {mediaInfo.audio_formats.map((format: AudioFormat) => {
@@ -303,9 +263,6 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 const buttonId = `audio_${format.format_id}`
                 const isDownloading = downloadingId === buttonId
                 const fileSize = format.filesize > 0 ? formatFileSize(format.filesize) : 'Size unknown'
-                
-                const bitrateMatch = format.bitrate.match(/(\d+)/)
-                const bitrateValue = bitrateMatch ? bitrateMatch[0] : '128'
                 
                 return (
                   <div key={format.format_id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -323,36 +280,18 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDownload(mediaInfo.webpage_url, bitrateValue, bitrateValue, 'audio', buttonId)}
+                      // 👇 FIXED: Passing 'audio' as the quality
+                      onClick={() => handleDownload(mediaInfo.webpage_url, format.format_id, 'audio', 'audio', buttonId)}
                       disabled={isDownloading}
-                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white relative overflow-hidden ${
-                        isDownloading 
-                          ? 'bg-purple-400 cursor-wait' 
-                          : 'bg-purple-600 hover:bg-purple-700'
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 text-white ${
+                        isDownloading ? 'bg-purple-400 cursor-wait' : 'bg-purple-600 hover:bg-purple-700'
                       }`}
                     >
-                      {isDownloading && (
-                        <div 
-                          className="absolute inset-0 bg-white/40 dark:bg-white/30 transition-all duration-300"
-                          style={{ 
-                            width: '100%',
-                            animation: 'pulse-light 0.8s ease-in-out infinite'
-                          }}
-                        />
+                      {isDownloading ? (
+                        <><FaSpinner className="animate-spin" /> Downloading...</>
+                      ) : (
+                        <><FaDownload /> Download MP3</>
                       )}
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        {isDownloading ? (
-                          <>
-                            <FaSpinner className="animate-spin" />
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <FaDownload />
-                            Download MP3
-                          </>
-                        )}
-                      </span>
                     </button>
                   </div>
                 )
@@ -360,15 +299,7 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
             </div>
           )}
 
-          {activeTab === 'audio' && mediaInfo.audio_formats.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <p>No audio formats available for this URL.</p>
-            </div>
-          )}
-
-          {/* ============================================
-              THUMBNAIL SECTION - FIXED
-              ============================================ */}
+          {/* THUMBNAIL SECTION */}
           {activeTab === 'thumbnail' && mediaInfo.thumbnail && (
             <div className="text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -380,22 +311,17 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
               <button
                 onClick={async () => {
                   try {
-                    // Fetch the image as a blob
                     const response = await fetch(mediaInfo.thumbnail)
                     const blob = await response.blob()
-                    
-                    // Create a download link
                     const link = document.createElement('a')
                     link.href = URL.createObjectURL(blob)
                     link.download = `${mediaInfo.title || 'thumbnail'}.jpg`
                     document.body.appendChild(link)
                     link.click()
                     document.body.removeChild(link)
-                    
                     setTimeout(() => URL.revokeObjectURL(link.href), 100)
                   } catch (error) {
                     console.error('Thumbnail download failed:', error)
-                    // Fallback: open in new tab if fetch fails
                     window.open(mediaInfo.thumbnail, '_blank')
                   }
                 }}
@@ -404,21 +330,10 @@ export default function ResultSection({ mediaInfo }: ResultSectionProps) {
                 <FaDownload className="mr-2" />
                 Download Thumbnail
               </button>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Thumbnail downloads instantly
-              </p>
             </div>
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse-light {
-          0% { opacity: 0.3; }
-          50% { opacity: 0.7; }
-          100% { opacity: 0.3; }
-        }
-      `}</style>
     </section>
   )
 }
