@@ -3,14 +3,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin, FaDesktop } from 'react-icons/fa'
-import Image from 'next/image'
-import Link from 'next/link'
+import { FaSpinner, FaTimes, FaDownload, FaMusic, FaImage, FaYoutube, FaFacebook, FaInstagram, FaTiktok, FaTwitter, FaReddit, FaLinkedin, FaDesktop, FaLink, FaArrowRight } from 'react-icons/fa'
 
 interface HeroSectionProps {
   onConvert: (url: string) => void
   isLoading: boolean
   error?: { message: string; suggestion?: string } | null
+  isDesktopApp?: boolean;
 }
 
 export default function HeroSection({ onConvert, isLoading, error }: HeroSectionProps) {
@@ -216,209 +215,96 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
   }
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-4 pt-16 overflow-hidden">
-      {/* ============================================
-          BACKGROUND - PREMIUM
-          ============================================ */}
-      <div className="absolute inset-0 z-0">
-        <div className="relative w-full h-full">
-          <Image
-            src="/image1.jpg"
-            alt="Background"
-            fill
-            priority
-            className="object-cover scale-110 blur-[2px] opacity-100 dark:opacity-90"
-            sizes="100vw"
-            quality={100}
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-white/50 dark:from-gray-900/50 dark:via-gray-900/30 dark:to-gray-900/60" />
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-500/5 via-purple-500/5 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
-        </div>
+    <section className="md-hero">
+      {/* Decorative background (pure CSS, no image) */}
+      <div className="md-hero__bg" aria-hidden="true">
+        <span className="md-hero__glow md-hero__glow--a" />
+        <span className="md-hero__glow md-hero__glow--b" />
       </div>
 
-      {/* ============================================
-          CONTENT
-          ============================================ */}
-      <div className="relative z-10 w-full max-w-5xl mx-auto">
-        {/* ============================================
-            WEB CONVERTER WARNING - SHOWS ON EVERY VISIT
-            ============================================ */}
+      <div className="md-hero__inner">
+        {/* Web converter warning */}
         {showWebWarning && (
-          <div className="relative z-50 mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 backdrop-blur-xl border border-amber-200/60 dark:border-amber-800/60 rounded-2xl shadow-2xl animate-fadeIn max-w-3xl mx-auto">
-            <button
-              onClick={closeWebWarning}
-              className="absolute top-3 right-3 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
-            >
-              <FaTimes className="w-4 h-4" />
+          <div className="md-alert md-alert--warn animate-fadeIn">
+            <button onClick={closeWebWarning} className="md-alert__close" aria-label="Dismiss">
+              <FaTimes />
             </button>
-            <div className="flex items-start gap-4 pr-8">
-              <div className="flex-shrink-0 text-3xl mt-0.5">⚠️</div>
+            <div className="md-alert__body">
+              <span className="md-alert__emoji">⚠️</span>
               <div>
-                <h4 className="text-amber-800 dark:text-amber-300 font-bold text-base">
-                  Web Converter is Disabled
-                </h4>
-                <p className="text-amber-700 dark:text-amber-400 text-sm mt-1">
-                  The web version cannot process downloads because <code className="bg-amber-100 dark:bg-amber-800/30 px-2 py-0.5 rounded text-xs font-mono">yt-dlp</code> is not available on this server.
+                <h4 className="md-alert__title">Web Converter is Disabled</h4>
+                <p className="md-alert__text">
+                  The web version cannot process downloads because <code>yt-dlp</code> is not available on this server.
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={scrollToInstall}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg text-sm"
-                  >
-                    <FaDesktop className="w-4 h-4" />
-                    Download Desktop App
+                <div className="md-alert__actions">
+                  <button onClick={scrollToInstall} className="md-btn md-btn--small">
+                    <FaDesktop /> Download Desktop App
                   </button>
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                    Works offline • Full features
-                  </span>
+                  <span className="md-alert__note">Works offline • Full features</span>
                 </div>
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-400 dark:from-amber-600 dark:to-orange-600 rounded-b-2xl overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-2xl animate-shrink-width"
-                style={{ animationDuration: '8s', animationFillMode: 'forwards' }}
-              />
+            <div className="md-alert__bar">
+              <div className="md-alert__bar-fill animate-shrink-width" style={{ animationDuration: '8s', animationFillMode: 'forwards' }} />
             </div>
           </div>
         )}
 
-        {/* ============================================
-            ERROR MESSAGE
-            ============================================ */}
+        {/* Error message */}
         {displayError && (
-          <div className="relative z-50 mb-6 p-5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-red-200/50 dark:border-red-800/50 rounded-2xl shadow-2xl animate-fadeIn max-w-3xl mx-auto">
-            <button
-              onClick={closeError}
-              className="absolute top-3 right-3 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-            >
-              <FaTimes className="w-4 h-4" />
+          <div className="md-alert md-alert--error animate-fadeIn">
+            <button onClick={closeError} className="md-alert__close" aria-label="Dismiss">
+              <FaTimes />
             </button>
-            <p className="text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-3 pr-8 flex-wrap">
-              <span className="text-2xl">⚠️</span>
-              <span>{displayError.message}</span>
-              {displayError.suggestion && (
-                <span className="text-sm bg-red-100/50 dark:bg-red-800/30 px-3 py-1 rounded-full">
-                  💡 {displayError.suggestion}
-                </span>
-              )}
-            </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-200 dark:bg-red-800/50 rounded-b-2xl overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-red-500 to-red-300 rounded-b-2xl animate-shrink-width"
-                style={{ animationDuration: '5s', animationFillMode: 'forwards' }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="text-center">
-          {/* ============================================
-              BADGE - UPDATED
-              ============================================ */}
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 mb-8 bg-amber-50/80 dark:bg-amber-900/30 backdrop-blur-xl border border-amber-200/40 dark:border-amber-700/40 rounded-full shadow-xl">
-            <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 tracking-wider uppercase flex items-center gap-2">
-              <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
-              💻 Web Version • Download Desktop App for Full Features
-            </span>
-          </div>
-
-          {/* ============================================
-              MAIN HEADING
-              ============================================ */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight">
-            <span className="
-              bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 
-              dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 
-              bg-clip-text text-transparent 
-              drop-shadow-2xl
-              [text-shadow:_0_4px_40px_rgba(0,0,0,0.3),_0_0_80px_rgba(0,0,0,0.15),_0_2px_10px_rgba(0,0,0,0.2)]
-              dark:[text-shadow:_0_4px_40px_rgba(0,0,0,0.5),_0_0_80px_rgba(0,0,0,0.3)]
-            ">
-              Download Videos,<br />
-              Audio &amp; Thumbnails
-            </span>
-          </h1>
-
-          {/* ============================================
-              SUBTITLE - WITH DESKTOP APP CTA
-              ============================================ */}
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-8 font-medium px-4
-            text-gray-800/95 dark:text-gray-100/95
-            [text-shadow:_0_2px_20px_rgba(0,0,0,0.15),_0_4px_30px_rgba(255,255,255,0.3)]
-            dark:[text-shadow:_0_2px_30px_rgba(0,0,0,0.6)]">
-            Paste any URL from{' '}
-            <span className="inline-flex items-center gap-1 text-red-800 dark:text-red-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
-              YouTube
-            </span>
-            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
-            <span className="inline-flex items-center gap-1 text-blue-800 dark:text-blue-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
-              Facebook
-            </span>
-            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
-            <span className="inline-flex items-center gap-1 text-purple-800 dark:text-purple-800 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
-              Instagram
-            </span>
-            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
-            <span className="inline-flex items-center gap-1 text-black dark:text-white font-bold hover:scale-105 transition-transform duration-200 cursor-default">
-              TikTok
-            </span>
-            <span className="text-gray-400 dark:text-gray-500 mx-1.5">•</span>
-            <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 font-bold hover:scale-105 transition-transform duration-200 cursor-default">
-              1000+
-            </span>
-            <span className="text-gray-600 dark:text-gray-300">more</span>
-          </p>
-
-          {/* ============================================
-              SEARCH FORM
-              ============================================ */}
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-3xl mx-auto">
-            <div className="flex-1 relative group">
-              <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl blur transition-all duration-500 ${
-                isFocused ? 'opacity-60' : 'opacity-20'
-              }`}></div>
-              
-              <div className="relative">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  inputMode="url"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="🔗 Paste video or audio URL here..."
-                  value={url}
-                  onChange={handleChange}
-                  onPaste={handlePaste}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  className="w-full px-6 py-4.5 pr-14 rounded-2xl bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-2 border-white/60 dark:border-gray-700/60 focus:border-blue-500/60 dark:focus:border-blue-400/60 focus:ring-4 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-base md:text-lg shadow-2xl"
-                />
-                
-                {isLoading && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <FaSpinner className="animate-spin text-blue-600 dark:text-blue-400 w-5 h-5" />
-                  </div>
-                )}
-
-                {isPasted && !isLoading && url.trim() && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full animate-pulse">
-                      ✓ Pasted
-                    </span>
-                  </div>
-                )}
+            <div className="md-alert__body">
+              <span className="md-alert__emoji">⚠️</span>
+              <div>
+                <p className="md-alert__text md-alert__text--strong">{displayError.message}</p>
+                {displayError.suggestion && <p className="md-alert__hint">💡 {displayError.suggestion}</p>}
               </div>
             </div>
+            <div className="md-alert__bar">
+              <div className="md-alert__bar-fill animate-shrink-width" style={{ animationDuration: '5s', animationFillMode: 'forwards' }} />
+            </div>
+          </div>
+        )}
 
-            <button
-              type="submit"
-              disabled={isLoading || !url.trim()}
-              className="relative px-8 py-4.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 hover:from-blue-500 hover:via-indigo-400 hover:to-purple-500 text-white font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base md:text-lg shadow-2xl hover:shadow-3xl hover:scale-105 transform min-w-[180px] group overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-              
+        <div className="md-hero__content">
+          <span className="md-hero__eyebrow">
+            <span className="md-hero__dot" />
+            Free • No sign-up • 1000+ sites
+          </span>
+
+          <h1 className="md-hero__title">
+            Download videos, audio
+            <br />
+            <span className="md-hero__title-grad">&amp; thumbnails</span> in one paste.
+          </h1>
+
+          <p className="md-hero__sub">
+            Drop in a link from YouTube, Instagram, TikTok, Facebook and more. Pick your quality, up to 8K video or 320kbps audio.
+          </p>
+
+          {/* Command bar */}
+          <form onSubmit={handleSubmit} className={`md-hero__form ${isFocused ? 'is-focused' : ''}`}>
+            <FaLink className="md-hero__form-icon" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Paste video or audio URL here..."
+              value={url}
+              onChange={handleChange}
+              onPaste={handlePaste}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              className="md-hero__input"
+              aria-label="Video or audio URL"
+            />
+            {isPasted && !isLoading && url.trim() && <span className="md-hero__pasted">✓ Pasted</span>}
+            <button type="submit" disabled={isLoading || !url.trim()} className="md-btn md-hero__submit">
               {isLoading ? (
                 <>
                   <FaSpinner className="animate-spin" />
@@ -426,114 +312,55 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
                 </>
               ) : (
                 <>
-                  <span className="text-xl">🚀</span>
-                  <span>CONVERTER</span>
+                  <span>Convert</span>
+                  <FaArrowRight />
                 </>
               )}
             </button>
           </form>
 
-          {/* ============================================
-              PLATFORM TAGS
-              ============================================ */}
-          <div className="mt-8 flex flex-wrap justify-center gap-2.5">
+          <p className="md-hero__hint">
+            <span className="md-hero__dot" /> Paste a URL to auto-convert instantly
+          </p>
+
+          {/* Platforms */}
+          <div className="md-hero__platforms">
             {['YouTube', 'Facebook', 'Instagram', 'TikTok', 'X', 'Reddit', 'LinkedIn'].map((site) => {
               const Icon = platformIcons[site]
               return (
-                <span 
-                  key={site} 
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border border-white/50 dark:border-gray-700/50 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 hover:bg-white/90 dark:hover:bg-gray-800/90 cursor-default group"
-                >
-                  {Icon && <Icon className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />}
-                  <span>{site}</span>
+                <span key={site} className="md-chip">
+                  {Icon && <Icon />}
+                  {site}
                 </span>
               )
             })}
+            <span className="md-chip md-chip--more">+1000 more</span>
           </div>
 
-          {/* ============================================
-              FEATURE HIGHLIGHTS
-              ============================================ */}
-          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
-              <FaDownload className="text-blue-500 w-4 h-4" />
-              <span>Up to 8K</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
-              <FaMusic className="text-purple-500 w-4 h-4" />
-              <span>320kbps Audio</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-md">
-              <FaImage className="text-pink-500 w-4 h-4" />
-              <span>HD Thumbnails</span>
-            </div>
+          {/* Stats */}
+          <div className="md-hero__stats">
+            <div className="md-stat"><FaDownload /><strong>8K</strong><span>Max video quality</span></div>
+            <div className="md-stat"><FaMusic /><strong>320kbps</strong><span>MP3 audio</span></div>
+            <div className="md-stat"><FaImage /><strong>HD</strong><span>Thumbnails</span></div>
           </div>
 
-          {/* ============================================
-              FOOTER HINT - UPDATED WITH DESKTOP APP LINK
-              ============================================ */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300
-            [text-shadow:_0_2px_15px_rgba(0,0,0,0.1)]">
-            <span className="text-lg">💡</span>
-            <span>Paste a URL to auto-convert instantly</span>
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="w-px h-6 bg-gray-300 dark:bg-gray-600"></span>
-            <button
-              onClick={scrollToInstall}
-              className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-semibold transition-colors"
-            >
-              <FaDesktop className="w-3.5 h-3.5" />
-              <span>Download Desktop App</span>
-            </button>
-          </div>
+          <button onClick={scrollToInstall} className="md-hero__cta">
+            <FaDesktop /> Get the Desktop App
+          </button>
         </div>
       </div>
 
-      {/* ============================================
-          SCROLL INDICATOR
-          ============================================ */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
-        <div className="flex flex-col items-center gap-1.5 animate-bounce opacity-70 hover:opacity-100 transition-opacity">
-          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
-            Scroll
-          </span>
-          <div className="w-5 h-8 rounded-full border-2 border-gray-400/40 dark:border-gray-500/40 flex justify-center backdrop-blur-sm bg-white/10 dark:bg-gray-800/10">
-            <div className="w-1.5 h-2.5 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mt-1.5 animate-pulse"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================
-          CSS ANIMATIONS
-          ============================================ */}
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-15px) scale(0.98);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+          from { opacity: 0; transform: translateY(-15px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
-
         @keyframes shrink-width {
-          from {
-            width: 100%;
-          }
-          to {
-            width: 0%;
-          }
+          from { width: 100%; }
+          to { width: 0%; }
         }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        .animate-shrink-width {
-          animation: shrink-width 5s linear forwards;
-        }
+        .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-shrink-width { animation: shrink-width 5s linear forwards; }
       `}</style>
     </section>
   )
