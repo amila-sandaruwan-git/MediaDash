@@ -1,151 +1,99 @@
+// app/components/Navbar.tsx
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { FaSun, FaMoon, FaDownload } from 'react-icons/fa'
-import { useTheme } from './ThemeProvider'
+import { useState, useEffect, useCallback } from 'react'
+import { FaDownload } from 'react-icons/fa'
 
-export default function Navbar() {
-  const { theme, toggleTheme } = useTheme()
+// We define the interface so it accepts the isDesktopApp prop
+interface NavbarProps {
+  isDesktopApp?: boolean
+}
+
+export default function Navbar({ isDesktopApp }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const onScroll = () => setIsScrolled(window.scrollY > 10)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    const onResize = () => window.innerWidth >= 768 && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onResize)
     }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' })
-    }
-  }
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
 
-  if (!mounted) {
-    return (
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-                MediaDash
-              </span>
-            </div>
-          </div>
-        </div>
-      </nav>
-    )
-  }
+  const scrollToSection = useCallback((id: string) => {
+    setMenuOpen(false)
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 30)
+  }, [])
+
+  // Build the links array dynamically based on environment
+  const links = [
+    { id: 'about', label: 'About' },
+    { id: 'help', label: 'Help' },
+    // 👇 Only add the Install link if we are on the web
+    ...(isDesktopApp ? [] : [{ id: 'install', label: 'Install', icon: true }]),
+  ]
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      isScrolled 
-        ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg' 
-        : 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm'
-    }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Left side - Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2 group">
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 bg-clip-text text-transparent hover:from-blue-500 hover:via-indigo-400 hover:to-cyan-400 transition-all duration-300">
-                MediaDash
-              </span>
-              <span className="hidden sm:inline text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                v1.0
-              </span>
-            </Link>
-          </div>
+    <nav className={`md-nav ${isScrolled || menuOpen ? 'is-scrolled' : ''}`}>
+      <div className="md-nav__inner">
+        <Link href="/" className="md-nav__brand" onClick={() => setMenuOpen(false)}>
+          <span className="md-nav__logo">MediaDash</span>
+          <span className="md-nav__badge">v1.0</span>
+        </Link>
 
-          {/* ============================================
-              CENTER - NAVIGATION LINKS - REDESIGNED
-              ============================================ */}
-          <div className="hidden md:flex items-center space-x-1">
-            {/* About Button */}
-            <button 
-              onClick={() => scrollToSection('about')}
-              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
-                text-gray-700 dark:text-gray-300 
-                hover:text-blue-600 dark:hover:text-blue-400
-                transition-all duration-300
-                hover:bg-blue-50 dark:hover:bg-blue-900/20
-                hover:shadow-md dark:hover:shadow-blue-500/10
-                group
-              "
-            >
-              <span className="relative z-10">About</span>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="md-nav__links">
+          {links.map((l) => (
+            <button key={l.id} onClick={() => scrollToSection(l.id)} className="md-nav__link">
+              {l.icon && <FaDownload className="md-nav__icon" />}
+              {l.label}
             </button>
+          ))}
+        </div>
 
-            {/* Help Button */}
-            <button 
-              onClick={() => scrollToSection('help')}
-              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
-                text-gray-700 dark:text-gray-300 
-                hover:text-blue-600 dark:hover:text-blue-400
-                transition-all duration-300
-                hover:bg-blue-50 dark:hover:bg-blue-900/20
-                hover:shadow-md dark:hover:shadow-blue-500/10
-                group
-              "
-            >
-              <span className="relative z-10">Help</span>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            </button>
-
-            {/* ============================================
-                INSTALL BUTTON - NEW
-                ============================================ */}
-            <button 
-              onClick={() => scrollToSection('install')}
-              className="relative px-5 py-2.5 rounded-xl text-sm font-medium
-                text-gray-700 dark:text-gray-300 
-                hover:text-blue-600 dark:hover:text-blue-400
-                transition-all duration-300
-                hover:bg-blue-50 dark:hover:bg-blue-900/20
-                hover:shadow-md dark:hover:shadow-blue-500/10
-                group
-              "
-            >
-              <span className="relative z-10 flex items-center gap-1.5">
-                <FaDownload className="text-xs" />
-                Install
-              </span>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            </button>
-          </div>
-
-          {/* Right side - Dark Mode Toggle */}
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-105"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? (
-                <FaSun className="w-5 h-5 text-yellow-500 hover:text-yellow-400 transition-colors" />
-              ) : (
-                <FaMoon className="w-5 h-5 text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors" />
-              )}
-            </button>
-
-            {/* Mobile menu button */}
-            <button className="md:hidden p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300">
-              <svg className="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
+        <div className="md-nav__actions">
+          <button
+            className={`md-nav__burger ${menuOpen ? 'is-open' : ''}`}
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="md-mobile-menu"
+          >
+            <span /><span /><span />
+          </button>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      <div id="md-mobile-menu" className={`md-nav__panel ${menuOpen ? 'is-open' : ''}`}>
+        {links.map((l) => (
+          <button key={l.id} onClick={() => scrollToSection(l.id)} className="md-nav__panel-link">
+            {l.icon && <FaDownload />}
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <div
+        className={`md-nav__backdrop ${menuOpen ? 'is-open' : ''}`}
+        onClick={() => setMenuOpen(false)}
+        aria-hidden="true"
+      />
     </nav>
   )
 }
