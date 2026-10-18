@@ -1,18 +1,14 @@
 // app/layout.tsx
-
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import './globals.css'
-import { ThemeProvider } from './components/ThemeProvider'
+import './globals.css'  // 👈 global styles
+import './mediadash-design.css'   // 👈 same folder as layout.tsx (app/)
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'MediaDash - Download Videos, Audio & Thumbnails',
   description: 'Download videos, audio and thumbnails from YouTube, Facebook, Instagram, TikTok and more',
-  icons: {
-    icon: '/favicon.ico',
-  },
 }
 
 export default function RootLayout({
@@ -23,9 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   )

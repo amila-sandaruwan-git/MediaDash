@@ -2,8 +2,8 @@
 
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Analytics } from '@vercel/analytics/react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+//import { Analytics } from '@vercel/analytics/react'
 
 import Navbar from './components/Navbar'
 import HeroSection from './components/HeroSection'
@@ -20,58 +20,57 @@ export default function Home() {
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<{ message: string; suggestion?: string } | null>(null)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   
   // Use refs to track ongoing requests
   const abortControllerRef = useRef<AbortController | null>(null)
   const currentRequestIdRef = useRef<number>(0)
 
+  // Check if running in Electron Desktop App
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.navigator.userAgent.includes('Electron')) {
+      setIsDesktopApp(true)
+    }
+  }, [])
+
   // ============================================
   // OPTIMIZED onConvert FUNCTION
   // ============================================
   const handleConvert = useCallback(async (url: string) => {
-    // Trim the URL
     const trimmedUrl = url.trim()
     if (!trimmedUrl) return
 
-    // Cancel any ongoing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
 
-    // Increment request ID to track the latest request
     currentRequestIdRef.current += 1
     const requestId = currentRequestIdRef.current
 
-    // Set loading state immediately (UI updates instantly)
     setIsLoading(true)
     setError(null)
     setMediaInfo(null)
 
     try {
-      // Create new AbortController for this request
       const controller = new AbortController()
       abortControllerRef.current = controller
 
       console.log(`[Request ${requestId}] Starting conversion for: ${trimmedUrl}`)
 
-      // Use axios with AbortSignal
       const response = await axios.post(
-        '/api/convert',
+        'http://localhost:3001/api/convert',
         { url: trimmedUrl },
         {
           signal: controller.signal,
-          timeout: 60000, // 60 second timeout
+          timeout: 60000, 
         }
       )
 
-      // Check if this is still the latest request
       if (requestId !== currentRequestIdRef.current) {
         console.log(`[Request ${requestId}] Cancelled - newer request exists`)
         return
       }
-
-      console.log(`[Request ${requestId}] Response received`)
 
       if (response.data.success) {
         setMediaInfo(response.data.data)
@@ -83,31 +82,25 @@ export default function Home() {
         }, 100)
       } else {
         setError({
-          message: response.data.message || 'Failed to process the URL',
+          message: response.data.message || response.data.error || 'Failed to process the URL',
           suggestion: response.data.suggestion
         })
       }
     } catch (err: any) {
-      // Ignore abort errors (they're expected)
       if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-        console.log(`[Request ${requestId}] Cancelled by user`)
         return
       }
-
-      // Check if this is still the latest request
-      if (requestId !== currentRequestIdRef.current) {
-        return
-      }
+      if (requestId !== currentRequestIdRef.current) return
 
       console.error(`[Request ${requestId}] Error:`, err)
       
+      // 👇 THIS IS THE FIX: It pulls the exact error from yt-dlp (err.response.data.error)
       const errorData = err.response?.data
       setError({
-        message: errorData?.message || 'An error occurred while processing your request.',
-        suggestion: errorData?.suggestion
+        message: errorData?.error || errorData?.message || 'An error occurred while processing your request.',
+        suggestion: errorData?.suggestion || 'Check the app console for more details.'
       })
     } finally {
-      // Only clear loading if this is the latest request
       if (requestId === currentRequestIdRef.current) {
         setIsLoading(false)
       }
@@ -119,26 +112,27 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navbar />
+      <Navbar isDesktopApp={isDesktopApp} />
       
       <div className="pt-16">
-        {/* ============================================
-            PASS ERROR TO HERO SECTION
-            ============================================ */}
         <HeroSection 
           onConvert={handleConvert} 
           isLoading={isLoading}
           error={error}
+          isDesktopApp={isDesktopApp}
         />
         
         {mediaInfo && <ResultSection mediaInfo={mediaInfo} />}
         
         <AboutSection />
         <HelpSection />
-        <InstallSection />
+        
+        {/* 👇 Only show Install section if NOT in the desktop app */}
+        {!isDesktopApp && <InstallSection />}
+        
         <Footer />
         <ScrollToTop />
-        <Analytics />
+        
       </div>
     </main>
   )
