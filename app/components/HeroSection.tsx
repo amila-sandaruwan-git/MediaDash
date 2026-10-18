@@ -240,7 +240,7 @@ export default function HeroSection({ onConvert, isLoading, error }: HeroSection
                   <button onClick={scrollToInstall} className="md-btn md-btn--small">
                     <FaDesktop /> Download Desktop App
                   </button>
-                  <span className="md-alert__note">Works offline • Full features</span>
+                  
                 </div>
               </div>
             </div>
